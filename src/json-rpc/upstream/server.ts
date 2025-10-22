@@ -1,0 +1,126 @@
+import { getLogger } from "@logtape/logtape";
+import { BehaviorSubject, firstValueFrom, Subject } from "rxjs";
+import { filter, map, take } from "rxjs/operators";
+
+import type {
+	JSONRPCNotification,
+	JSONRPCRequest,
+	JSONRPCResponse,
+} from "../types";
+import type {
+	SharedSubscription,
+	UpstreamServer,
+	UpstreamServerConfig,
+} from "./types";
+
+const logger = getLogger(["wsmux", "upstream"]);
+
+export function createUpstreamServer({
+	url,
+	supportedMethods,
+	retryDelay = 2000,
+}: UpstreamServerConfig): UpstreamServer {
+	const connection$ = new BehaviorSubject<WebSocket | null>(null);
+	const message$ = new Subject<JSONRPCResponse | JSONRPCNotification>();
+	const unsubscribers = new Map<string, () => void>();
+
+	let stopped = false;
+	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+	async function connect() {
+		if (stopped) return;
+		logger.info`[${url}] connecting...`;
+
+		const ws = new WebSocket(url);
+
+		ws.onopen = () => {
+			logger.info`[${url}] connected ok`;
+			connection$.next(ws);
+		};
+
+		ws.onmessage = ({ data }) => handleMessage(data.toString());
+
+		ws.onclose = (event) => {
+			connection$.next(null);
+			logger.info`[${url}] disconnected (${event.code})`;
+
+			if (!stopped && event.code !== 1000) {
+				reconnectTimer = setTimeout(connect, retryDelay);
+			}
+		};
+
+		ws.onerror = (err) => {
+			logger.error("[{url}] websocket error", { url, err });
+		};
+	}
+
+	const server: UpstreamServer = {
+		url,
+		nextId: 0,
+		supportedMethods,
+		message$,
+		subscriptions: new Map<string, SharedSubscription>(),
+		unsubscribers,
+		state: {},
+		pending: new Map<string, Promise<void>>(),
+
+		isReady: () => {
+			const ws = connection$.value;
+			return ws?.readyState === WebSocket.OPEN;
+		},
+
+		send(req: JSONRPCRequest) {
+			const ws = connection$.value;
+			if (!ws || ws.readyState !== WebSocket.OPEN) {
+				logger.warn("send while upstream not connected");
+				return;
+			}
+			ws.send(JSON.stringify(req));
+		},
+
+		async request(req: JSONRPCRequest): Promise<JSONRPCResponse> {
+			const upstreamId = server.nextId++;
+			const ws = connection$.value;
+			if (!ws || ws.readyState !== WebSocket.OPEN) {
+				throw new Error("Upstream not connected");
+			}
+
+			const resp$ = message$.pipe(
+				filter((m): m is JSONRPCResponse => "id" in m && m.id === upstreamId),
+				take(1),
+				map((response) => ({ ...response, id: req.id }) as JSONRPCResponse),
+			);
+
+			ws.send(JSON.stringify({ ...req, id: upstreamId }));
+			return firstValueFrom(resp$);
+		},
+
+		unsubscribe(localId: string) {
+			const unsub = unsubscribers.get(localId);
+			if (unsub) unsub();
+			unsubscribers.delete(localId);
+		},
+
+		async destroy() {
+			logger.info`destroying upstream ${url}`;
+			stopped = true;
+			if (reconnectTimer) clearTimeout(reconnectTimer);
+			connection$.value?.close(1000, "Stopped");
+			connection$.next(null);
+			message$.complete();
+		},
+
+		connect,
+	};
+
+	function handleMessage(data: string) {
+		try {
+			const msg = JSON.parse(data) as JSONRPCResponse | JSONRPCNotification;
+			message$.next(msg);
+		} catch (err) {
+			logger.error("[{url}] JSON parse error", { url, err });
+		}
+	}
+
+	return server;
+}

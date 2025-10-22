@@ -1,0 +1,140 @@
+import type { ServerWebSocket, WebSocketHandler } from "bun";
+
+type WebSocketEventType =
+	| "open"
+	| "message"
+	| "close"
+	| "drain"
+	| "ping"
+	| "pong"
+	| "error";
+
+type WebSocketContextMap<Data> = {
+	open: { ws: ServerWebSocket<Data> };
+	message: { ws: ServerWebSocket<Data>; message: string | Uint8Array };
+	close: { ws: ServerWebSocket<Data>; code: number; reason: string };
+	drain: { ws: ServerWebSocket<Data> };
+	ping: { ws: ServerWebSocket<Data>; data: Uint8Array };
+	pong: { ws: ServerWebSocket<Data>; data: Uint8Array };
+	error: {
+		ws: ServerWebSocket<Data>;
+		error: unknown;
+		event: WebSocketEventType;
+		ctx: unknown;
+	};
+};
+
+export type WebSocketContext<
+	Data,
+	K extends WebSocketEventType = WebSocketEventType,
+> = WebSocketContextMap<Data>[K];
+
+export type WebSocketMiddleware<Data = unknown> = {
+	[K in WebSocketEventType]?: (
+		ctx: WebSocketContext<Data, K>,
+		next: () => Promise<void>,
+	) => Promise<void>;
+};
+
+export type WebSocketHandlerOptions<Data> = Pick<
+	WebSocketHandler<Data>,
+	| "backpressureLimit"
+	| "maxPayloadLength"
+	| "publishToSelf"
+	| "sendPings"
+	| "closeOnBackpressureLimit"
+	| "perMessageDeflate"
+	| "idleTimeout"
+> & {
+	middlewares?: WebSocketMiddleware<Data>[];
+};
+
+function compose<Data, K extends WebSocketEventType>(
+	middlewares: WebSocketMiddleware<Data>[],
+	event: K,
+) {
+	const stack = middlewares
+		.map((mw) => mw[event])
+		.filter((fn): fn is NonNullable<typeof fn> => !!fn);
+
+	return async (
+		ctx: WebSocketContext<Data, K>,
+		terminal?: () => Promise<void>,
+	) => {
+		let i = -1;
+
+		const dispatch = async (index: number): Promise<void> => {
+			if (index <= i) throw new Error("next() called multiple times");
+			i = index;
+
+			const fn = stack[index];
+			try {
+				if (fn) await fn(ctx, () => dispatch(index + 1));
+				else if (terminal) await terminal();
+			} catch (err) {
+				const errorCtx: WebSocketContext<Data, "error"> = {
+					ws: ctx.ws,
+					error: err,
+					event,
+					ctx,
+				};
+				const errorStack = middlewares
+					.map((mw) => mw.error)
+					.filter((fn): fn is NonNullable<typeof fn> => !!fn);
+				for (const errFn of errorStack) {
+					await errFn(errorCtx, async () => {});
+				}
+				// fallback logging if no error middleware handled it
+				if (errorStack.length === 0) {
+					console.error(`WebSocket error on ${event}`, err);
+				}
+			}
+		};
+
+		await dispatch(0);
+	};
+}
+
+export function createWebSocketHandler<Data = unknown>(
+	options: WebSocketHandlerOptions<Data> = {},
+): WebSocketHandler<Data> {
+	const { middlewares = [], ...rest } = options;
+
+	const stacks = {
+		open: compose(middlewares, "open"),
+		message: compose(middlewares, "message"),
+		close: compose(middlewares, "close"),
+		drain: compose(middlewares, "drain"),
+		ping: compose(middlewares, "ping"),
+		pong: compose(middlewares, "pong"),
+	};
+
+	return {
+		data: {} as Data,
+		...rest,
+
+		async open(ws) {
+			await stacks.open({ ws });
+		},
+
+		async message(ws, message) {
+			await stacks.message({ ws, message });
+		},
+
+		async close(ws, code, reason) {
+			await stacks.close({ ws, code, reason });
+		},
+
+		async drain(ws) {
+			await stacks.drain({ ws });
+		},
+
+		async ping(ws, data) {
+			await stacks.ping({ ws, data });
+		},
+
+		async pong(ws, data) {
+			await stacks.pong({ ws, data });
+		},
+	};
+}
