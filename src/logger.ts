@@ -6,7 +6,7 @@ export async function initLogger() {
 		loggers: [
 			{
 				category: "wsmux.chainhead.follow",
-				lowestLevel: "debug",
+				lowestLevel: "info",
 				sinks: ["console"],
 			},
 			{ category: "wsmux", lowestLevel: "info", sinks: ["console"] },
