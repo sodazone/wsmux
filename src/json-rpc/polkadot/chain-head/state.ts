@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
-import { firstValueFrom, Observable, ReplaySubject } from "rxjs";
-import { take } from "rxjs/operators";
+import { firstValueFrom, Observable, of, ReplaySubject } from "rxjs";
+import { catchError, take, timeout } from "rxjs/operators";
 
 import type { JSONRPCNotification } from "../../types";
 
@@ -168,11 +168,24 @@ export function createStateManager() {
 	) {
 		if (!snapshot.initialized) {
 			logger.info("Replay requested before initialization, waiting...");
-			await firstValueFrom(initialized$.pipe(take(1)));
+			await firstValueFrom(
+				initialized$.pipe(
+					take(1),
+					timeout(10_000),
+					catchError(() => of(null)),
+				),
+			).catch(() => {
+				//
+			});
 			logger.info("Initialization complete, proceeding with replay");
 		}
 
-		const init = snapshot.initialized!;
+		if (!snapshot.initialized) {
+			logger.error("Initialization failed, cannot replay");
+			return;
+		}
+
+		const init = snapshot.initialized;
 		client.send({
 			jsonrpc: "2.0",
 			method: "chainHead_v1_followEvent",
