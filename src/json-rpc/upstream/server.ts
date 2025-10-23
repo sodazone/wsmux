@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
-import { BehaviorSubject, firstValueFrom, Subject } from "rxjs";
-import { filter, map, take } from "rxjs/operators";
+import { BehaviorSubject, firstValueFrom, of, Subject } from "rxjs";
+import { catchError, filter, map, take, timeout } from "rxjs/operators";
 
 import type {
 	JSONRPCNotification,
@@ -15,37 +15,41 @@ import type {
 
 const logger = getLogger(["wsmux", "upstream"]);
 
+function createMessageSubject() {
+	return new Subject<JSONRPCResponse | JSONRPCNotification>();
+}
+
 export function createUpstreamServer({
 	url,
 	supportedMethods,
 	retryDelay = 2000,
 }: UpstreamServerConfig): UpstreamServer {
 	const connection$ = new BehaviorSubject<WebSocket | null>(null);
-	const message$ = new Subject<JSONRPCResponse | JSONRPCNotification>();
 	const unsubscribers = new Map<string, () => void>();
+	let message$ = createMessageSubject();
 
 	let stopped = false;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-	const cleanup = () => {
-		if (reconnectTimer) {
-			clearTimeout(reconnectTimer);
-		}
+	function cleanup() {
+		if (reconnectTimer) clearTimeout(reconnectTimer);
+
 		message$.complete();
-	};
+		message$ = createMessageSubject();
+	}
 
 	async function connect() {
-		if (stopped) {
-			return;
-		}
+		if (stopped) return;
 
 		logger.info`[${url}] connecting...`;
-
 		const ws = new WebSocket(url);
 
 		ws.onopen = () => {
 			logger.info`[${url}] connected ok`;
 			connection$.next(ws);
+			message$.subscribe({
+				complete: () => logger.info(`[${url}] message$ completed`),
+			});
 		};
 
 		ws.onmessage = ({ data }) => handleMessage(data.toString());
@@ -55,6 +59,7 @@ export function createUpstreamServer({
 			logger.info`[${url}] disconnected (${event.code})`;
 
 			if (!stopped) {
+				logger.debug`[${url}] scheduling reconnect in ${retryDelay}ms`;
 				cleanup();
 				reconnectTimer = setTimeout(connect, retryDelay);
 			}
@@ -69,11 +74,11 @@ export function createUpstreamServer({
 		url,
 		nextId: 0,
 		supportedMethods,
-		message$,
 		subscriptions: new Map<string, SharedSubscription>(),
 		unsubscribers,
 		state: {},
 		pending: new Map<string, Promise<void>>(),
+		message$,
 
 		isReady: () => {
 			const ws = connection$.value;
@@ -100,10 +105,28 @@ export function createUpstreamServer({
 				filter((m): m is JSONRPCResponse => "id" in m && m.id === upstreamId),
 				take(1),
 				map((response) => ({ ...response, id: req.id }) as JSONRPCResponse),
+				timeout(10_000),
+				catchError((err) => {
+					logger.warn("Request stream aborted or timed out", { url, err });
+					return of(null);
+				}),
 			);
 
 			ws.send(JSON.stringify({ ...req, id: upstreamId }));
-			return firstValueFrom(resp$);
+
+			let response: JSONRPCResponse | null = null;
+			try {
+				response = await firstValueFrom(resp$);
+			} catch (err) {
+				logger.warn("firstValueFrom threw, upstream probably closed", { err });
+				throw new Error("Upstream disconnected");
+			}
+
+			if (!response) {
+				throw new Error("No response from upstream (disconnected or timeout)");
+			}
+
+			return response;
 		},
 
 		unsubscribe(localId: string) {
@@ -116,7 +139,6 @@ export function createUpstreamServer({
 			logger.info`stopping upstream ${url}`;
 			stopped = true;
 			connection$.value?.close(1000, "Stopped");
-
 			cleanup();
 		},
 
