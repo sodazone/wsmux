@@ -9,7 +9,7 @@ bun install
 To run:
 
 ```bash
-bun run src/proxy.ts
+bun start
 ```
 
 ## Specification
