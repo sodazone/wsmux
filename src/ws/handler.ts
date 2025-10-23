@@ -91,18 +91,28 @@ function compose<Data, K extends WebSocketEventType>(
 		ctx: WebSocketContext<Data, K>,
 		terminal?: () => Promise<void>,
 	) => {
-		let i = -1;
-
-		const dispatch = async (index: number): Promise<void> => {
-			if (index <= i) {
-				throw new Error("next() called multiple times");
-			}
-			i = index;
-
+		const dispatch = async (index: number) => {
 			const fn = stack[index];
+
+			if (!fn) {
+				if (terminal) {
+					try {
+						await terminal();
+					} catch (err) {
+						await handleErrorMiddlewares(ctx, err);
+					}
+				}
+				return;
+			}
+
 			try {
-				if (fn) await fn(ctx, () => dispatch(index + 1));
-				else if (terminal) await terminal();
+				await fn(ctx, async () => {
+					try {
+						await dispatch(index + 1);
+					} catch (err) {
+						await handleErrorMiddlewares(ctx, err);
+					}
+				});
 			} catch (err) {
 				await handleErrorMiddlewares(ctx, err);
 			}
