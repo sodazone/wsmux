@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape";
 import type { ServerWebSocket, WebSocketHandler } from "bun";
 
 type WebSocketEventType =
@@ -49,6 +50,8 @@ export type WebSocketHandlerOptions<Data> = Pick<
 	middlewares?: WebSocketMiddleware<Data>[];
 };
 
+const logger = getLogger(["wsmux", "ws-handler"]);
+
 function compose<Data, K extends WebSocketEventType>(
 	middlewares: WebSocketMiddleware<Data>[],
 	event: K,
@@ -57,6 +60,33 @@ function compose<Data, K extends WebSocketEventType>(
 		.map((mw) => mw[event])
 		.filter((fn): fn is NonNullable<typeof fn> => !!fn);
 
+	async function handleErrorMiddlewares(
+		ctx: WebSocketContext<Data, K>,
+		err: unknown,
+	) {
+		const errorCtx: WebSocketContext<Data, "error"> = {
+			ws: ctx.ws,
+			error: err,
+			event,
+			ctx,
+		};
+		const errorStack = middlewares
+			.map((mw) => mw.error)
+			.filter((fn): fn is NonNullable<typeof fn> => !!fn);
+
+		for (const errFn of errorStack) {
+			try {
+				await errFn(errorCtx, async () => {});
+			} catch (innerErr) {
+				logger.error("Error in error middleware", { innerErr });
+			}
+		}
+
+		if (errorStack.length === 0) {
+			logger.error("WebSocket error on {event}", { event, err });
+		}
+	}
+
 	return async (
 		ctx: WebSocketContext<Data, K>,
 		terminal?: () => Promise<void>,
@@ -64,7 +94,9 @@ function compose<Data, K extends WebSocketEventType>(
 		let i = -1;
 
 		const dispatch = async (index: number): Promise<void> => {
-			if (index <= i) throw new Error("next() called multiple times");
+			if (index <= i) {
+				throw new Error("next() called multiple times");
+			}
 			i = index;
 
 			const fn = stack[index];
@@ -72,22 +104,7 @@ function compose<Data, K extends WebSocketEventType>(
 				if (fn) await fn(ctx, () => dispatch(index + 1));
 				else if (terminal) await terminal();
 			} catch (err) {
-				const errorCtx: WebSocketContext<Data, "error"> = {
-					ws: ctx.ws,
-					error: err,
-					event,
-					ctx,
-				};
-				const errorStack = middlewares
-					.map((mw) => mw.error)
-					.filter((fn): fn is NonNullable<typeof fn> => !!fn);
-				for (const errFn of errorStack) {
-					await errFn(errorCtx, async () => {});
-				}
-				// fallback logging if no error middleware handled it
-				if (errorStack.length === 0) {
-					console.error(`WebSocket error on ${event}`, err);
-				}
+				await handleErrorMiddlewares(ctx, err);
 			}
 		};
 
