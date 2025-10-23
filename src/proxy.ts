@@ -13,6 +13,13 @@ async function run(
 ) {
 	await initLogger();
 
+	process.on("uncaughtException", (err) => {
+		console.error("Uncaught Exception:", err);
+	});
+	process.on("unhandledRejection", (reason) => {
+		console.error("Unhandled Rejection:", reason);
+	});
+
 	const registry = createUpstreamRegistry([
 		{ url: "wss://dot-rpc.stakeworld.io" },
 	]);
@@ -33,7 +40,10 @@ async function run(
 
 	logger.info`Server listening on ${server.hostname}:${server.port}`;
 
+	let stopping = false;
 	const shutdown = () => {
+		if (stopping) return;
+		stopping = true;
 		server.stop();
 		registry.destroy();
 	};
