@@ -15,40 +15,123 @@ const logger = getLogger(["wsmux", "chainhead", "state"]);
 
 export type StateManager = ReturnType<typeof createStateManager>;
 
-export function createStateManager() {
-	const snapshot: Snapshot = {
-		events: [],
-	};
+function createBlockTracker(
+	maxKnown = 512,
+	onApply: (msg: JSONRPCNotification) => void,
+) {
+	const known = new Set<string>();
+	const pending: JSONRPCNotification[] = [];
 
+	function remember(hash?: string) {
+		if (!hash) {
+			return;
+		}
+
+		known.add(hash);
+		if (known.size > maxKnown) {
+			let excess = known.size - maxKnown;
+			for (const h of known) {
+				known.delete(h);
+				if (--excess <= 0) break;
+			}
+		}
+	}
+
+	function flushPending() {
+		let applied = true;
+		while (applied) {
+			applied = false;
+			for (let i = 0; i < pending.length; ) {
+				const msg = pending[i];
+				if (!msg) {
+					continue;
+				}
+				const parent = msg?.params?.result?.parentBlockHash;
+				if (!parent || known.has(parent)) {
+					pending.splice(i, 1);
+					onApply(msg);
+					applied = true;
+				} else {
+					i++;
+				}
+			}
+		}
+	}
+
+	function handleNewBlock(msg: JSONRPCNotification) {
+		const event = msg.params?.result;
+		const parent = event?.parentBlockHash;
+
+		if (parent && !known.has(parent)) {
+			const blockHash = event?.blockHash;
+			if (pending.some((p) => p.params?.result?.blockHash === blockHash)) {
+				logger.debug((l) => l`Duplicate pending block ${blockHash}, skipping`);
+				return false;
+			}
+
+			pending.push(msg);
+			logger.debug(
+				(l) =>
+					l`Queued block ${blockHash} (unknown parent ${parent}), pending=${pending.length}`,
+			);
+			return false;
+		}
+
+		remember(event?.blockHash);
+		flushPending();
+		return true;
+	}
+
+	return {
+		remember,
+		handleNewBlock,
+		flushPending,
+		known,
+		get stats() {
+			return { known: known.size, pending: pending.length };
+		},
+	};
+}
+
+export function createStateManager() {
+	const snapshot: Snapshot = { events: [] };
 	const initialized$ = new ReplaySubject<JSONRPCNotification>(1);
 
+	const tracker = createBlockTracker(512, update);
+
 	function update(msg: JSONRPCNotification) {
-		const event = msg.params?.result;
-		if (!event) {
+		const event = msg.params?.result?.event;
+		const result = msg.params?.result;
+		if (!result) {
 			logger.warn("Received malformed notification without params.result");
 			return;
 		}
 
-		switch (event.event) {
+		switch (event) {
 			case "initialized": {
 				snapshot.initialized = msg;
-				snapshot.finalized = event.finalizedBlockHashes?.at(-1);
-				snapshot.runtime = event.finalizedBlockRuntime;
+				snapshot.finalized = result.finalizedBlockHashes?.at(-1);
+				snapshot.runtime = result.finalizedBlockRuntime;
 
 				logger.info`Initialized chainHead snapshot: finalized=${snapshot.finalized}`;
 
+				for (const h of result.finalizedBlockHashes || []) tracker.remember(h);
 				initialized$.next(msg);
+				tracker.flushPending();
 				break;
 			}
+
 			case "newBlock": {
+				if (!tracker.handleNewBlock(msg)) return;
 				snapshot.events.push(msg);
 				logger.debug(
 					(l) => l`New block event appended (total=${snapshot.events.length})`,
 				);
 				break;
 			}
+
 			case "finalized": {
-				const hash = event.finalizedBlockHashes.at(-1);
+				const hash = result.finalizedBlockHashes.at(-1);
 				if (!hash) {
 					logger.warn("Finalized event without finalizedBlockHashes");
 					break;
@@ -58,6 +141,7 @@ export function createStateManager() {
 				if (snapshot.initialized) {
 					snapshot.initialized.params.result.finalizedBlockHashes = [hash];
 				}
+
 				const idx = snapshot.events.findIndex(
 					(e) => e.params.result.blockHash === hash,
 				);
@@ -67,11 +151,14 @@ export function createStateManager() {
 						(l) => l`Pruned ${idx + 1} event(s) up to finalized block ${hash}`,
 					);
 				}
+
+				tracker.remember(hash);
+				tracker.flushPending();
 				break;
 			}
-			default: {
-				logger.debug((l) => l`Unhandled event type: ${event.event}`);
-			}
+
+			default:
+				logger.debug((l) => l`Unhandled event type: ${event}`);
 		}
 	}
 
@@ -81,22 +168,15 @@ export function createStateManager() {
 	) {
 		if (!snapshot.initialized) {
 			logger.info("Replay requested before initialization, waiting...");
-			try {
-				await firstValueFrom(initialized$.pipe(take(1)));
-			} catch (err) {
-				logger.error("Failed waiting for initialization", { err });
-				throw err;
-			}
+			await firstValueFrom(initialized$.pipe(take(1)));
+			logger.info("Initialization complete, proceeding with replay");
 		}
 
 		const init = snapshot.initialized!;
 		client.send({
 			jsonrpc: "2.0",
 			method: "chainHead_v1_followEvent",
-			params: {
-				...init.params,
-				subscription: clientSubId,
-			},
+			params: { ...init.params, subscription: clientSubId },
 		});
 
 		logger.info(
@@ -108,10 +188,7 @@ export function createStateManager() {
 			client.send({
 				jsonrpc: "2.0",
 				method: "chainHead_v1_followEvent",
-				params: {
-					...event.params,
-					subscription: clientSubId,
-				},
+				params: { ...event.params, subscription: clientSubId },
 			});
 		}
 	}
@@ -122,15 +199,27 @@ export function createStateManager() {
 			new Observable<JSONRPCNotification>((subscriber) => {
 				const subscription = source$.subscribe({
 					next(value) {
-						update(value);
-						const event = value.params?.result?.event;
-						if (event === "stop") {
-							logger.info("Received stop event, completing stream");
-							subscriber.next(value);
-							subscriber.complete();
+						const result = value.params?.result;
+						if (!result) {
 							return;
 						}
-						subscriber.next(value);
+
+						update(value);
+
+						const parent = result.parentBlockHash;
+						if (!parent || tracker.known.has(parent)) {
+							subscriber.next(value);
+						} else {
+							logger.debug(
+								(l) =>
+									l`Deferring emission for block ${result.blockHash} (missing parent ${parent})`,
+							);
+						}
+
+						if (result.event === "stop") {
+							logger.info("Received stop event, completing stream");
+							subscriber.complete();
+						}
 					},
 					error: (err) => {
 						logger.error("Error in upstream chainHead stream", { err });
