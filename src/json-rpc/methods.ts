@@ -7,17 +7,17 @@ export interface JSONRPCMethodHandler {
 		upstream: UpstreamServer,
 		downstream: DownstreamClient,
 		request: JSONRPCRequest,
-	) => void;
+	) => Promise<void>;
 }
 
-export function handleRPCMethod(
+export async function handleRPCMethod(
 	downstream: DownstreamClient,
 	upstream: UpstreamServer,
 	req: JSONRPCRequest,
 	handlers: Record<string, JSONRPCMethodHandler>,
-): void {
+): Promise<void> {
 	const handler = handlers[req.method];
 	if (!handler) return;
 
-	handler.handleRequest(upstream, downstream, req);
+	await handler.handleRequest(upstream, downstream, req);
 }
