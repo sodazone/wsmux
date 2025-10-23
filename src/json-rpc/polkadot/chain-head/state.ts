@@ -138,9 +138,6 @@ export function createStateManager() {
 				}
 
 				snapshot.finalized = hash;
-				if (snapshot.initialized) {
-					snapshot.initialized.params.result.finalizedBlockHashes = [hash];
-				}
 
 				const idx = snapshot.events.findIndex(
 					(e) => e.params.result.blockHash === hash,
@@ -174,9 +171,7 @@ export function createStateManager() {
 					timeout(10_000),
 					catchError(() => of(null)),
 				),
-			).catch(() => {
-				//
-			});
+			);
 			logger.info("Initialization complete, proceeding with replay");
 		}
 
@@ -189,7 +184,16 @@ export function createStateManager() {
 		client.send({
 			jsonrpc: "2.0",
 			method: "chainHead_v1_followEvent",
-			params: { ...init.params, subscription: clientSubId },
+			params: {
+				...init.params,
+				result: {
+					...init.params.result,
+					finalizedBlockHashes: init.params.result.finalizedBlockHashes
+						? [...init.params.result.finalizedBlockHashes]
+						: [],
+				},
+				subscription: clientSubId,
+			},
 		});
 
 		logger.info(
@@ -201,7 +205,11 @@ export function createStateManager() {
 			client.send({
 				jsonrpc: "2.0",
 				method: "chainHead_v1_followEvent",
-				params: { ...event.params, subscription: clientSubId },
+				params: {
+					...event.params,
+					result: { ...event.params.result },
+					subscription: clientSubId,
+				},
 			});
 		}
 	}
