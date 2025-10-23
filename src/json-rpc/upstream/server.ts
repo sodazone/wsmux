@@ -114,13 +114,7 @@ export function createUpstreamServer({
 
 			ws.send(JSON.stringify({ ...req, id: upstreamId }));
 
-			let response: JSONRPCResponse | null = null;
-			try {
-				response = await firstValueFrom(resp$);
-			} catch (err) {
-				logger.warn("firstValueFrom threw, upstream probably closed", { err });
-				throw new Error("Upstream disconnected");
-			}
+			const response = await firstValueFrom(resp$);
 
 			if (!response) {
 				throw new Error("No response from upstream (disconnected or timeout)");
