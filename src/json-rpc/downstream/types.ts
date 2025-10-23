@@ -12,6 +12,8 @@ export type DownstreamMessage =
 
 export type DownstreamClient = {
 	clientId: string;
+	pendingRequests: number;
+	lastRequestTimes: number[];
 	getLocalId(suffix: string): string;
 	send(message: DownstreamMessage): number;
 	addCloseListener(listener: () => void): void;

@@ -5,6 +5,12 @@ import type { JSONRPCMiddleware } from "./types";
 import type { UpstreamRegistry } from "./upstream";
 import { isJsonRpcRequest } from "./util";
 
+const MAX_PENDING_PER_CLIENT = 5;
+const MAX_GLOBAL_PENDING = 100;
+const REQUESTS_PER_SECOND = 10;
+
+let globalPending = 0;
+
 export const jsonRpcMiddleware = (
 	registry: UpstreamRegistry,
 	methodHandlers: Record<string, JSONRPCMethodHandler>,
@@ -15,53 +21,72 @@ export const jsonRpcMiddleware = (
 	},
 
 	close: async (ctx, next) => {
-		ctx.ws.data.client?.close();
+		ctx.ws.data.client?.close?.();
 		await next();
 	},
 
 	message: async (ctx, next) => {
-		const msg = ctx.message?.toString();
-		if (!msg) return next();
+		const raw = ctx.message?.toString();
+		if (!raw) return next();
 
 		const client = ctx.ws.data.client;
 		if (!client) return;
 
 		let req: unknown;
 		try {
-			req = JSON.parse(msg);
-		} catch (_err) {
-			client.send(
-				jsonRpcError({
-					kind: "PARSE_ERROR",
-				}),
-			);
+			req = JSON.parse(raw);
+		} catch {
+			client.send(jsonRpcError({ kind: "PARSE_ERROR" }));
 			return;
 		}
 
 		if (!isJsonRpcRequest(req)) {
+			client.send(jsonRpcError({ kind: "INVALID_REQUEST" }));
+			return;
+		}
+
+		const now = Date.now();
+		client.lastRequestTimes = client.lastRequestTimes.filter(
+			(t) => now - t < 1000,
+		);
+
+		if (client.lastRequestTimes.length >= REQUESTS_PER_SECOND) {
 			client.send(
 				jsonRpcError({
-					kind: "INVALID_REQUEST",
+					kind: "RATE_LIMITED",
+					message: "Rate limit exceeded",
+					req,
 				}),
 			);
 			return;
 		}
 
+		if (
+			client.pendingRequests >= MAX_PENDING_PER_CLIENT ||
+			globalPending >= MAX_GLOBAL_PENDING
+		) {
+			client.send(
+				jsonRpcError({
+					kind: "RATE_LIMITED",
+					message: "Too many concurrent requests",
+					req,
+				}),
+			);
+			return;
+		}
+
+		client.pendingRequests++;
+		globalPending++;
+		client.lastRequestTimes.push(now);
+
 		try {
 			const upstream = registry.resolveUpstream(ctx.ws.data, req.method);
 			if (!upstream) {
-				client.send(
-					jsonRpcError({
-						kind: "METHOD_NOT_FOUND",
-						req,
-					}),
-				);
+				client.send(jsonRpcError({ kind: "METHOD_NOT_FOUND", req }));
 				return;
 			}
 
-			if (ctx.ws.data.client) {
-				handleRPCMethod(ctx.ws.data.client, upstream, req, methodHandlers);
-			}
+			await handleRPCMethod(client, upstream, req, methodHandlers);
 		} catch (err) {
 			console.error("Error handling JSON-RPC message:", err);
 			client.send(
@@ -71,7 +96,9 @@ export const jsonRpcMiddleware = (
 					message: String(err),
 				}),
 			);
-			return;
+		} finally {
+			client.pendingRequests--;
+			globalPending--;
 		}
 
 		await next();

@@ -13,6 +13,8 @@ export function createDownstream(
 	const listeners = new Set<() => void>();
 	return {
 		clientId: ulid(),
+		pendingRequests: 0,
+		lastRequestTimes: [],
 		getLocalId(suffix: string): string {
 			return `${this.clientId}-${suffix}`;
 		},
