@@ -3,6 +3,10 @@
 	"module": "src/proxy.ts",
 	"type": "module",
 	"private": true,
+	"scripts": {
+		"start": "bun run src/proxy.ts",
+		"lint": "biome check --write"
+	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.6",
 		"@types/bun": "latest"
