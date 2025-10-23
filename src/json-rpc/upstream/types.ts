@@ -28,7 +28,7 @@ export type UpstreamServer = {
 	isReady(): boolean;
 	connect(): Promise<void>;
 	state: Record<string, unknown>;
-	destroy(): void;
+	stop(): void;
 };
 
 export type UpstreamServerConfig = {

@@ -31,7 +31,7 @@ export function createUpstreamRegistry(
 		},
 		destroy: () => {
 			servers.forEach((server) => {
-				server.destroy();
+				server.stop();
 			});
 		},
 	};

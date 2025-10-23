@@ -27,8 +27,18 @@ export function createUpstreamServer({
 	let stopped = false;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
+	const cleanup = () => {
+		if (reconnectTimer) {
+			clearTimeout(reconnectTimer);
+		}
+		message$.complete();
+	};
+
 	async function connect() {
-		if (stopped) return;
+		if (stopped) {
+			return;
+		}
+
 		logger.info`[${url}] connecting...`;
 
 		const ws = new WebSocket(url);
@@ -44,7 +54,8 @@ export function createUpstreamServer({
 			connection$.next(null);
 			logger.info`[${url}] disconnected (${event.code})`;
 
-			if (!stopped && event.code !== 1000) {
+			if (!stopped) {
+				cleanup();
 				reconnectTimer = setTimeout(connect, retryDelay);
 			}
 		};
@@ -101,13 +112,12 @@ export function createUpstreamServer({
 			unsubscribers.delete(localId);
 		},
 
-		async destroy() {
-			logger.info`destroying upstream ${url}`;
+		async stop() {
+			logger.info`stopping upstream ${url}`;
 			stopped = true;
-			if (reconnectTimer) clearTimeout(reconnectTimer);
 			connection$.value?.close(1000, "Stopped");
-			connection$.next(null);
-			message$.complete();
+
+			cleanup();
 		},
 
 		connect,
