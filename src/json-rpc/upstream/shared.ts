@@ -44,11 +44,12 @@ export function createSharedSubscription(
 	);
 
 	return {
+		hasLocalSubscription(localId: string) {
+			return localSubs.has(localId);
+		},
 		subscribeLocal(localId: string, downstream: DownstreamClient) {
-			if (localSubs.has(localId)) {
-				// TODO: This happens, maybe the ulid collides? Maybe the downstream client is reconnecting (no new clientId?)?
-				// throw Error(`Subscription with ID ${localId} already exists`);
-				return;
+			if (this.hasLocalSubscription(localId)) {
+				throw Error(`Subscription with ID ${localId} already exists`);
 			}
 
 			downstream.addCloseListener(() => {

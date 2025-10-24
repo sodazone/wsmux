@@ -10,6 +10,7 @@ import type {
 export type SharedSubscription = {
 	subscribeLocal(localId: string, downstream: DownstreamClient): void;
 	unsubscribeLocal(localId: string): void;
+	hasLocalSubscription(localId: string): boolean;
 	hasSubscribers(): boolean;
 	upstreamSubId: string;
 };

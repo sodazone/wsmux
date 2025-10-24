@@ -27,8 +27,6 @@ export const chainHead_v1_follow: JSONRPCMethodHandler = {
 		const inflight = upstream.pending.get(methodKey);
 		if (inflight) {
 			logger.debug((l) => l`Waiting for inflight ${methodKey} setup`);
-
-			// wait for the ongoing setup to complete
 			await inflight;
 		}
 
@@ -37,9 +35,13 @@ export const chainHead_v1_follow: JSONRPCMethodHandler = {
 		if (upstream.subscriptions.has(methodKey)) {
 			const shared = upstream.subscriptions.get(methodKey);
 			if (shared) {
-				logger.info`Reusing existing upstream subscription ${shared.upstreamSubId} for downstream ${downstream.clientId}`;
-
 				const localId = downstream.getLocalId(shared.upstreamSubId);
+
+				if (shared.hasLocalSubscription(localId)) {
+					return;
+				}
+
+				logger.info`Reusing existing upstream subscription ${shared.upstreamSubId} for downstream ${downstream.clientId}`;
 
 				downstream.send({
 					jsonrpc: "2.0",
