@@ -138,6 +138,11 @@ export function createStateManager() {
 				}
 
 				snapshot.finalized = hash;
+				if (snapshot.initialized) {
+					snapshot.initialized.params.result.finalizedBlockHashes = [
+						...result.finalizedBlockHashes,
+					];
+				}
 
 				const idx = snapshot.events.findIndex(
 					(e) => e.params.result.blockHash === hash,
@@ -181,6 +186,8 @@ export function createStateManager() {
 		}
 
 		const init = snapshot.initialized;
+		const replayEvents = [...snapshot.events];
+
 		client.send({
 			jsonrpc: "2.0",
 			method: "chainHead_v1_followEvent",
@@ -188,9 +195,9 @@ export function createStateManager() {
 				...init.params,
 				result: {
 					...init.params.result,
-					finalizedBlockHashes: init.params.result.finalizedBlockHashes
-						? [...init.params.result.finalizedBlockHashes]
-						: [],
+					finalizedBlockHashes: [
+						...(init.params.result.finalizedBlockHashes ?? []),
+					],
 				},
 				subscription: clientSubId,
 			},
@@ -201,7 +208,7 @@ export function createStateManager() {
 				l`Replayed initialized state and ${snapshot.events.length} pending events to ${clientSubId}`,
 		);
 
-		for (const event of snapshot.events) {
+		for (const event of replayEvents) {
 			client.send({
 				jsonrpc: "2.0",
 				method: "chainHead_v1_followEvent",
