@@ -21,11 +21,13 @@ async function getOrCreateFollow(
 		creatingFollows.set(followKey, p);
 		try {
 			await p;
+			return true;
 		} finally {
 			creatingFollows.delete(followKey);
 		}
 	} else {
 		await creatingFollows.get(followKey)!;
+		return false;
 	}
 }
 
@@ -53,7 +55,7 @@ export const chainHead_v1_follow: JSONRPCMethodHandler = {
 			const followIndex = follows.length;
 			const followKey = `${methodKey}:${followIndex}`;
 
-			await getOrCreateFollow(followKey, async () => {
+			const created = await getOrCreateFollow(followKey, async () => {
 				logger.info(
 					(l) =>
 						l`[Follow] Creating upstream follow ${followKey} (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
@@ -117,17 +119,19 @@ export const chainHead_v1_follow: JSONRPCMethodHandler = {
 					);
 				}
 			});
-			// let it fall through
-			// TODO: not exactly fine, all the concurrent subscriptions will fall through in the same
-			// follow stream
+			if (!created) {
+				downstream.send(
+					jsonRpcError({
+						kind: "RATE_LIMITED",
+						message: "No available follows",
+						req: request,
+					}),
+				);
+			}
+			return;
 		}
 
-		// recompute follows and select the least loaded follow
-		const updatedFollows = Array.from(upstream.subscriptions.entries()).filter(
-			([k]) => k.startsWith(methodKey),
-		);
-
-		selected = updatedFollows.reduce((a, b) =>
+		selected = follows.reduce((a, b) =>
 			a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
 		);
 
