@@ -4,6 +4,7 @@ import type { JSONRPCContextData } from "./json-rpc";
 import { createUpstreamRegistry, jsonRpcMiddleware } from "./json-rpc";
 import { polkadotMethods } from "./json-rpc/polkadot";
 import { initLogger } from "./logger";
+import { metricsMiddleware } from "./metrics";
 import { createWebSocketHandler } from "./ws";
 
 const logger = getLogger("wsmux");
@@ -13,20 +14,16 @@ async function run(
 ) {
 	await initLogger();
 
-	process.on("uncaughtException", (err) => {
-		console.error("Uncaught Exception:", err);
-	});
-	process.on("unhandledRejection", (reason) => {
-		console.error("Unhandled Rejection:", reason);
-	});
-
 	const registry = createUpstreamRegistry([
 		{ url: "wss://dot-rpc.stakeworld.io" },
 	]);
 	await registry.connectAll();
 
 	const handler = createWebSocketHandler<JSONRPCContextData>({
-		middlewares: [jsonRpcMiddleware(registry, polkadotMethods)],
+		middlewares: [
+			metricsMiddleware(),
+			jsonRpcMiddleware(registry, polkadotMethods),
+		],
 	});
 
 	const server = Bun.serve({
