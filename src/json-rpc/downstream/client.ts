@@ -10,7 +10,7 @@ const logger = getLogger(["wsmux", "downstream"]);
 export function createDownstream(
 	ws: ServerWebSocket<JSONRPCContextData>,
 ): DownstreamClient {
-	const listeners = new Set<() => void>();
+	const closeFns = new Set<() => void>();
 	return {
 		clientId: ulid(),
 		pendingRequests: 0,
@@ -25,12 +25,12 @@ export function createDownstream(
 				typeof message === "string" ? message : JSON.stringify(message),
 			);
 		},
-		addCloseListener: (listener: () => void) => {
-			listeners.add(listener);
+		addCloseFn: (closeFn: () => void) => {
+			closeFns.add(closeFn);
 		},
 		close: () => {
-			listeners.forEach((listener) => {
-				listener();
+			closeFns.forEach((closeFn) => {
+				closeFn();
 			});
 		},
 	};

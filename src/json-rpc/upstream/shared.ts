@@ -53,7 +53,7 @@ export function createSharedSubscription(
 				throw Error(`Subscription with ID ${localId} already exists`);
 			}
 
-			downstream.addCloseListener(() => {
+			downstream.addCloseFn(() => {
 				this.unsubscribeLocal(localId);
 			});
 

@@ -41,6 +41,7 @@ async function run(
 	const shutdown = () => {
 		if (stopping) return;
 		stopping = true;
+		handler.closeAll();
 		server.stop();
 		registry.destroy();
 	};
