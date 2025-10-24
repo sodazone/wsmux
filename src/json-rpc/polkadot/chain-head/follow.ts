@@ -34,7 +34,7 @@ export const chainHead_v1_follow: JSONRPCMethodHandler = {
 		const methodKey = "chainHead_v1_follow";
 		const clientId = downstream.clientId;
 
-		logger.debug((l) => l`Follow request from ${clientId}`);
+		logger.info((l) => l`Follow request from ${clientId}`);
 
 		const follows = Array.from(upstream.subscriptions.entries()).filter(([k]) =>
 			k.startsWith(methodKey),
@@ -117,13 +117,19 @@ export const chainHead_v1_follow: JSONRPCMethodHandler = {
 					);
 				}
 			});
-			return;
+			// let it fall through
+			// TODO: not exactly fine, all the concurrent subscriptions will fall through in the same
+			// follow stream
 		}
 
-		if (!selected && follows.length)
-			selected = follows.reduce((a, b) =>
-				a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
-			);
+		// recompute follows and select the least loaded follow
+		const updatedFollows = Array.from(upstream.subscriptions.entries()).filter(
+			([k]) => k.startsWith(methodKey),
+		);
+
+		selected = updatedFollows.reduce((a, b) =>
+			a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
+		);
 
 		if (!selected) {
 			downstream.send(
