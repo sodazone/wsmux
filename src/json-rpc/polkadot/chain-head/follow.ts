@@ -123,7 +123,7 @@ export const chainHead_v1_follow: JSONRPCMethodHandler = {
 				downstream.send(
 					jsonRpcError({
 						kind: "RATE_LIMITED",
-						message: "No available follows",
+						message: "Backpressure for reassignment",
 						req: request,
 					}),
 				);
