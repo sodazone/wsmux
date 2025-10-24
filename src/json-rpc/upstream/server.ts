@@ -78,7 +78,6 @@ export function createUpstreamServer({
 		subscriptions: new Map<string, SharedSubscription>(),
 		unsubscribers,
 		state: {},
-		pending: new Map<string, Promise<void>>(),
 		message$,
 
 		isReady: () => {

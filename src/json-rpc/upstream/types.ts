@@ -12,13 +12,13 @@ export type SharedSubscription = {
 	unsubscribeLocal(localId: string): void;
 	hasLocalSubscription(localId: string): boolean;
 	hasSubscribers(): boolean;
+	subscribersCount(): number;
 	upstreamSubId: string;
 };
 
 export type UpstreamServer = {
 	url: string;
 	nextId: number;
-	pending: Map<string, Promise<void>>;
 	subscriptions: Map<string, SharedSubscription>;
 	unsubscribers: Map<string, () => void>;
 	unsubscribe: (localId: string) => void;

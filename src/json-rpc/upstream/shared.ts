@@ -36,8 +36,9 @@ export function createSharedSubscription(
 			localSubs.clear();
 			try {
 				await destroy();
-			} catch (err) {
-				logger.error("upstream destroy failed", { err });
+			} catch {
+				// TODO: all awaiting replies must be canceled upon closing.
+				// logger.error("upstream destroy failed", { error });
 			}
 		}),
 		share(),
@@ -84,6 +85,10 @@ export function createSharedSubscription(
 		},
 
 		upstreamSubId,
+
+		subscribersCount() {
+			return localSubs.size;
+		},
 
 		hasSubscribers() {
 			return localSubs.size > 0;

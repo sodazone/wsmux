@@ -113,7 +113,10 @@ export function createStateManager() {
 				snapshot.finalized = result.finalizedBlockHashes?.at(-1);
 				snapshot.runtime = result.finalizedBlockRuntime;
 
-				logger.info`Initialized chainHead snapshot: finalized=${snapshot.finalized}`;
+				logger.debug(
+					(l) =>
+						l`Initialized chainHead snapshot: finalized=${snapshot.finalized}`,
+				);
 
 				for (const h of result.finalizedBlockHashes || []) tracker.remember(h);
 				initialized$.next(msg);
@@ -169,7 +172,7 @@ export function createStateManager() {
 		clientSubId: string,
 	) {
 		if (!snapshot.initialized) {
-			logger.info("Replay requested before initialization, waiting...");
+			logger.debug("Replay requested before initialization, waiting...");
 			await firstValueFrom(
 				initialized$.pipe(
 					take(1),
@@ -177,7 +180,7 @@ export function createStateManager() {
 					catchError(() => of(null)),
 				),
 			);
-			logger.info("Initialization complete, proceeding with replay");
+			logger.debug("Initialization complete, proceeding with replay");
 		}
 
 		if (!snapshot.initialized) {
@@ -203,7 +206,7 @@ export function createStateManager() {
 			},
 		});
 
-		logger.info(
+		logger.debug(
 			(l) =>
 				l`Replayed initialized state and ${snapshot.events.length} pending events to ${clientSubId}`,
 		);
