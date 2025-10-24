@@ -59,8 +59,9 @@ export function createUpstreamServer({
 			logger.info`[${url}] disconnected (${event.code})`;
 
 			if (!stopped) {
-				logger.debug`[${url}] scheduling reconnect in ${retryDelay}ms`;
 				cleanup();
+
+				logger.debug`[${url}] scheduling reconnect in ${retryDelay}ms`;
 				reconnectTimer = setTimeout(connect, retryDelay);
 			}
 		};
@@ -131,9 +132,10 @@ export function createUpstreamServer({
 
 		async stop() {
 			logger.info`stopping upstream ${url}`;
+
 			stopped = true;
-			connection$.value?.close(1000, "Stopped");
 			cleanup();
+			connection$.value?.close(1000, "Stopped");
 		},
 
 		connect,
