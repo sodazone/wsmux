@@ -64,7 +64,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					const shared = await getOrCreateFollow(followKey, async () => {
 						logger.info(
 							(l) =>
-								l`[Follow] Creating upstream follow ${followKey} (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
+								l`Creating upstream follow ${followKey} (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
 						);
 						const { result: upstreamSubId } = (await upstream.request({
 							...request,
@@ -115,7 +115,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							}),
 						);
 					} else {
-						logger.error("[Follow] Error creating follow", {
+						logger.error("Error creating follow", {
 							error: err,
 							clientId,
 							followKey,
@@ -151,14 +151,4 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 			}
 		},
 	};
-};
-
-export const chainHead_v1_unfollow: JSONRPCMethodHandler = {
-	async handleRequest(upstream, downstream, req) {
-		const localId = req.params?.[0];
-		if (!localId) return;
-		upstream.unsubscribe(localId);
-		logger.debug((l) => l`[Unfollow] Local ${localId} unsubscribed`);
-		downstream.send({ jsonrpc: "2.0", id: req.id ?? null, result: null });
-	},
 };

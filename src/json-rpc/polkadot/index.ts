@@ -1,9 +1,7 @@
 import type { JSONRPCMethodHandler } from "../methods";
-import {
-	chainHead_v1_follow,
-	chainHead_v1_unfollow,
-} from "./chain-head/follow";
+import { chainHead_v1_follow } from "./chain-head/follow";
 import { forwardChainHeadHandler } from "./chain-head/forward";
+import { chainHead_v1_unfollow } from "./chain-head/unfollow";
 
 export const polkadotMethods = {
 	rpc_methods: {
