@@ -1,5 +1,4 @@
 import { getLogger } from "@logtape/logtape";
-import { filter, map } from "rxjs";
 
 import {
 	createConcurrentCreator,
@@ -7,8 +6,10 @@ import {
 } from "../../../concurrency/creator";
 import { jsonRpcError } from "../../errors";
 import type { JSONRPCMethodHandler } from "../../methods";
-import type { JSONRPCNotification } from "../../types";
-import type { SharedSubscription } from "../../upstream";
+import type {
+	SharedSubscription,
+	SharedSubscriptionPool,
+} from "../../upstream";
 import { createStateMap } from "./state";
 
 const logger = getLogger("wsmux.chainhead.follow");
@@ -29,14 +30,15 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 
 			logger.info((l) => l`Follow request from ${clientId}`);
 
-			const chainHeadSubs = upstream.subscriptions.getOrCreate(methodKey, {
-				maxSubscribers: MAX_FOLLOWS_PER_UPSTREAM,
-			});
+			const chainHeadSubs: SharedSubscriptionPool =
+				upstream.subscriptions.getOrCreate(methodKey, {
+					maxSubscribers: MAX_FOLLOWS_PER_UPSTREAM,
+				});
 			const selected = chainHeadSubs.getLeastLoaded();
 
 			async function assignToDownstream(
-				shared: SharedSubscription,
 				followKey: string,
+				shared: SharedSubscription,
 			) {
 				logger.info(
 					(l) =>
@@ -53,7 +55,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 				upstream.unsubscribers.set(localId, () =>
 					shared.unsubscribeLocal(localId),
 				);
-				await state.getOrCreate(followKey).replay(downstream, localId);
+				await state.get(followKey)?.replay(downstream, localId);
 			}
 
 			if (chainHeadSubs.canCreateNew(selected)) {
@@ -72,36 +74,14 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 						})) as { result: string };
 						if (!upstreamSubId) throw new Error("No upstreamSubId in response");
 
-						const snapshot = state.getOrCreate(followKey);
-
-						const shared = chainHeadSubs.createShared(
+						return state.create(
 							followKey,
+							upstream,
 							upstreamSubId,
-							snapshot.withUpdate(
-								upstream.message$.pipe(
-									filter(
-										(msg) =>
-											"method" in msg &&
-											msg.method === "chainHead_v1_followEvent" &&
-											msg.params?.subscription === upstreamSubId,
-									),
-									map((msg) => msg as JSONRPCNotification),
-								),
-							),
-							async () => {
-								logger.info((l) => l`Unfollowed upstream ${upstreamSubId}`);
-								await upstream.request({
-									jsonrpc: "2.0",
-									method: "chainHead_v1_unfollow",
-									params: [upstreamSubId],
-								});
-								state.remove(followKey);
-							},
+							chainHeadSubs,
 						);
-
-						return shared;
 					});
-					await assignToDownstream(shared, followKey);
+					await assignToDownstream(followKey, shared);
 					return;
 				} catch (err) {
 					if (err instanceof TooManyWaitersError) {
@@ -113,7 +93,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							}),
 						);
 					} else {
-						logger.error("Error creating follow", {
+						logger.error("Error creating follow {clientId} {followKey}", {
 							error: err,
 							clientId,
 							followKey,
@@ -145,7 +125,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 			const [followKey, shared] = selected;
 			const localId = downstream.getLocalId(shared.upstreamSubId);
 			if (!shared.hasLocalSubscription(localId)) {
-				await assignToDownstream(shared, followKey);
+				await assignToDownstream(followKey, shared);
 			}
 		},
 	};

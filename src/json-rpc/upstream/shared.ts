@@ -7,6 +7,15 @@ import type { SharedSubscription } from "./types";
 
 const logger = getLogger(["wsmux", "upstream", "shared"]);
 
+export type SharedSubscriptionPoolOptions = {
+	maxSubscribers?: number;
+	destroy?: () => void;
+};
+
+export type SharedSubscriptionPool = ReturnType<
+	ReturnType<typeof createSharedSubscriptionGroup>["getOrCreate"]
+>;
+
 /**
  * Creates a shared subscription group that manages multiple shared subscription pools.
  */
@@ -21,7 +30,10 @@ export function createSharedSubscriptionGroup() {
 				const destroy = () => {
 					groups.delete(key);
 				};
-				groups.set(key, createSharedSubscriptionPool({ ...opts, destroy }));
+				groups.set(
+					key,
+					createSharedSubscriptionPool(key, { ...opts, destroy }),
+				);
 			}
 			return groups.get(key)!;
 		},
@@ -55,8 +67,8 @@ function createSharedSubscription(
 				return;
 			}
 
-			localSubs.forEach((sub) => {
-				sub.unsubscribe();
+			localSubs.forEach((subscription) => {
+				subscription.unsubscribe();
 			});
 			localSubs.clear();
 			try {
@@ -85,7 +97,7 @@ function createSharedSubscription(
 				this.unsubscribeLocal(localId);
 			});
 
-			const sub = shared$.subscribe({
+			const subscription = shared$.subscribe({
 				next: (notif) => {
 					try {
 						downstream.send({
@@ -103,7 +115,7 @@ function createSharedSubscription(
 					}
 				},
 			});
-			localSubs.set(localId, sub);
+			localSubs.set(localId, subscription);
 		},
 
 		unsubscribeLocal(localId: string) {
@@ -124,24 +136,24 @@ function createSharedSubscription(
 	};
 }
 
-export type SharedSubscriptionPoolOptions = {
-	maxSubscribers?: number;
-	destroy?: () => void;
-};
-
 /**
- * Fully encapsulated pool of shared subscriptions per method.
- * Tracks least-loaded subscriptions and localId → SharedSubscription mapping for O(1) lookup.
+ * Pool of shared subscriptions per method.
+ * Tracks least-loaded subscriptions and localId to SharedSubscription mapping for O(1) lookup.
  */
-function createSharedSubscriptionPool({
-	maxSubscribers: maxSubscriptions = 10,
-	destroy,
-}: SharedSubscriptionPoolOptions) {
+function createSharedSubscriptionPool(
+	key: string,
+	{
+		maxSubscribers: maxSubscriptions = 10,
+		destroy,
+	}: SharedSubscriptionPoolOptions,
+) {
 	const subscriptions = new Map<string, SharedSubscription>();
 	const localIdIndex = new Map<string, SharedSubscription>();
 	let leastLoaded: [string, SharedSubscription] | undefined;
 
 	return {
+		id: key,
+
 		getByLocalId(localId: string) {
 			return localIdIndex.get(localId);
 		},

@@ -1,8 +1,13 @@
 import { getLogger } from "@logtape/logtape";
 import { firstValueFrom, Observable, of, ReplaySubject } from "rxjs";
-import { catchError, take, timeout } from "rxjs/operators";
+import { catchError, filter, map, take, timeout } from "rxjs/operators";
 
 import type { JSONRPCNotification } from "../../types";
+import type {
+	SharedSubscription,
+	SharedSubscriptionPool,
+	UpstreamServer,
+} from "../../upstream";
 
 type Snapshot = {
 	initialized?: JSONRPCNotification;
@@ -93,7 +98,7 @@ function createBlockTracker(
 	};
 }
 
-export function createStateManager() {
+function createStateManager() {
 	const snapshot: Snapshot = { events: [] };
 	const initialized$ = new ReplaySubject<JSONRPCNotification>(1);
 
@@ -224,49 +229,64 @@ export function createStateManager() {
 		}
 	}
 
+	function handleUpdates(source$: Observable<JSONRPCNotification>) {
+		return new Observable<JSONRPCNotification>((subscriber) => {
+			const subscription = source$.subscribe({
+				next(value) {
+					const result = value.params?.result;
+					if (!result) {
+						return;
+					}
+
+					update(value);
+
+					const parent = result.parentBlockHash;
+					if (!parent || tracker.known.has(parent)) {
+						subscriber.next(value);
+					} else {
+						logger.debug(
+							(l) =>
+								l`Deferring emission for block ${result.blockHash} (missing parent ${parent})`,
+						);
+					}
+
+					if (result.event === "stop") {
+						logger.info("Received stop event, completing stream");
+						subscriber.complete();
+					}
+				},
+				error: (err) => {
+					logger.error("Error in upstream chainHead stream", { err });
+					subscriber.error(err);
+				},
+				complete: () => {
+					logger.debug("Upstream chainHead stream completed");
+					subscriber.complete();
+				},
+			});
+
+			return () => {
+				logger.debug("Unsubscribed from chainHead stream");
+				subscription.unsubscribe();
+			};
+		});
+	}
+
 	return {
 		snapshot,
-		withUpdate: (source$: Observable<JSONRPCNotification>) =>
-			new Observable<JSONRPCNotification>((subscriber) => {
-				const subscription = source$.subscribe({
-					next(value) {
-						const result = value.params?.result;
-						if (!result) {
-							return;
-						}
-
-						update(value);
-
-						const parent = result.parentBlockHash;
-						if (!parent || tracker.known.has(parent)) {
-							subscriber.next(value);
-						} else {
-							logger.debug(
-								(l) =>
-									l`Deferring emission for block ${result.blockHash} (missing parent ${parent})`,
-							);
-						}
-
-						if (result.event === "stop") {
-							logger.info("Received stop event, completing stream");
-							subscriber.complete();
-						}
-					},
-					error: (err) => {
-						logger.error("Error in upstream chainHead stream", { err });
-						subscriber.error(err);
-					},
-					complete: () => {
-						logger.debug("Upstream chainHead stream completed");
-						subscriber.complete();
-					},
-				});
-
-				return () => {
-					logger.debug("Unsubscribed from chainHead stream");
-					subscription.unsubscribe();
-				};
-			}),
+		withUpdater: (upstreamSubId: string, upstream: UpstreamServer) => {
+			return handleUpdates(
+				upstream.message$.pipe(
+					filter(
+						(msg) =>
+							"method" in msg &&
+							msg.method === "chainHead_v1_followEvent" &&
+							msg.params?.subscription === upstreamSubId,
+					),
+					map((msg) => msg as JSONRPCNotification),
+				),
+			);
+		},
 		replay,
 	};
 }
@@ -274,15 +294,34 @@ export function createStateManager() {
 export function createStateMap() {
 	const stateManagers = new Map<string, StateManager>();
 	return {
-		getOrCreate(key: string): StateManager {
-			if (!stateManagers.has(key)) {
-				const stateManager = createStateManager();
-				stateManagers.set(key, stateManager);
-			}
-			return stateManagers.get(key)!;
+		get(key: string) {
+			return stateManagers.get(key);
 		},
-		remove(key: string) {
-			stateManagers.delete(key);
+		create(
+			followKey: string,
+			upstream: UpstreamServer,
+			upstreamSubId: string,
+			pool: SharedSubscriptionPool,
+		): SharedSubscription {
+			if (!stateManagers.has(followKey)) {
+				const stateManager = createStateManager();
+				stateManagers.set(followKey, stateManager);
+			}
+			const stateManager = stateManagers.get(followKey)!;
+			return pool.createShared(
+				pool.id,
+				upstreamSubId,
+				stateManager.withUpdater(upstreamSubId, upstream),
+				async () => {
+					logger.info((l) => l`Unfollowed upstream ${upstreamSubId}`);
+					await upstream.request({
+						jsonrpc: "2.0",
+						method: "chainHead_v1_unfollow",
+						params: [upstreamSubId],
+					});
+					stateManagers.delete(followKey);
+				},
+			);
 		},
 	};
 }

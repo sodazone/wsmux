@@ -9,7 +9,11 @@ import type {
 import type { createSharedSubscriptionGroup } from "./shared";
 
 export type SharedSubscription = {
-	subscribeLocal(localId: string, downstream: DownstreamClient): void;
+	subscribeLocal(
+		localId: string,
+		downstream: DownstreamClient,
+		options?: Record<string, any>,
+	): void;
 	unsubscribeLocal(localId: string): void;
 	hasLocalSubscription(localId: string): boolean;
 	hasSubscribers(): boolean;
