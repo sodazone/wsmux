@@ -124,7 +124,9 @@ function compose<Data, K extends WebSocketEventType>(
 
 export function createWebSocketHandler<Data = unknown>(
 	options: WebSocketHandlerOptions<Data> = {},
-): WebSocketHandler<Data> {
+): WebSocketHandler<Data> & {
+	closeAll(): void;
+} {
 	const { middlewares = [], ...rest } = options;
 
 	const stacks = {
@@ -136,11 +138,14 @@ export function createWebSocketHandler<Data = unknown>(
 		pong: compose(middlewares, "pong"),
 	};
 
+	const activeSockets = new Set<ServerWebSocket<Data>>();
+
 	return {
 		data: {} as Data,
 		...rest,
 
 		async open(ws) {
+			activeSockets.add(ws);
 			await stacks.open({ ws });
 		},
 
@@ -150,6 +155,7 @@ export function createWebSocketHandler<Data = unknown>(
 
 		async close(ws, code, reason) {
 			await stacks.close({ ws, code, reason });
+			activeSockets.delete(ws);
 		},
 
 		async drain(ws) {
@@ -162,6 +168,12 @@ export function createWebSocketHandler<Data = unknown>(
 
 		async pong(ws, data) {
 			await stacks.pong({ ws, data });
+		},
+
+		closeAll() {
+			for (const ws of activeSockets) {
+				if (ws.readyState !== 3) ws.close(1001, "Server shutdown");
+			}
 		},
 	};
 }

@@ -12,15 +12,3 @@ export function isJsonRpcRequest(obj: unknown): obj is JSONRPCRequest {
 		(o.id === undefined || typeof o.id === "string" || typeof o.id === "number")
 	);
 }
-
-export function deferred<T = void>() {
-	let resolve!: (value: T | PromiseLike<T>) => void;
-	let reject!: (reason?: unknown) => void;
-
-	const promise = new Promise<T>((res, rej) => {
-		resolve = res;
-		reject = rej;
-	});
-
-	return { promise, resolve, reject };
-}

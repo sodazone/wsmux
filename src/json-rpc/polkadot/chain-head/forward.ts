@@ -14,7 +14,10 @@ export const forwardChainHeadHandler: JSONRPCMethodHandler = {
 			return;
 		}
 
-		const shared = upstream.subscriptions.get("chainHead_v1_follow");
+		const shared = upstream.subscriptions
+			.get("chainHead_v1_follow")
+			?.getByLocalId(localId);
+
 		if (!shared) {
 			downstream.send(
 				jsonRpcError({

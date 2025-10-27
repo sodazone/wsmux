@@ -7,11 +7,8 @@ import type {
 	JSONRPCRequest,
 	JSONRPCResponse,
 } from "../types";
-import type {
-	SharedSubscription,
-	UpstreamServer,
-	UpstreamServerConfig,
-} from "./types";
+import { createSharedSubscriptionGroup } from "./shared";
+import type { UpstreamServer, UpstreamServerConfig } from "./types";
 
 const logger = getLogger(["wsmux", "upstream"]);
 
@@ -75,10 +72,8 @@ export function createUpstreamServer({
 		url,
 		nextId: 0,
 		supportedMethods,
-		subscriptions: new Map<string, SharedSubscription>(),
+		subscriptions: createSharedSubscriptionGroup(),
 		unsubscribers,
-		state: {},
-		pending: new Map<string, Promise<void>>(),
 		message$,
 
 		isReady: () => {

@@ -5,9 +5,9 @@ import type { JSONRPCMiddleware } from "./types";
 import type { UpstreamRegistry } from "./upstream";
 import { isJsonRpcRequest } from "./util";
 
-const MAX_PENDING_PER_CLIENT = 5;
-const MAX_GLOBAL_PENDING = 100;
-const REQUESTS_PER_SECOND = 10;
+const MAX_PENDING_PER_CLIENT = 50;
+const MAX_GLOBAL_PENDING = 500;
+const REQUESTS_PER_SECOND = 20;
 
 let globalPending = 0;
 
@@ -54,7 +54,7 @@ export const jsonRpcMiddleware = (
 			client.send(
 				jsonRpcError({
 					kind: "RATE_LIMITED",
-					message: "Rate limit exceeded",
+					message: "Rate limit exceeded (wsmux)",
 					req,
 				}),
 			);
@@ -68,7 +68,7 @@ export const jsonRpcMiddleware = (
 			client.send(
 				jsonRpcError({
 					kind: "RATE_LIMITED",
-					message: "Too many concurrent requests",
+					message: `Too many concurrent requests (${client.pendingRequests} ${globalPending})`,
 					req,
 				}),
 			);

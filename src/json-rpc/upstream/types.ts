@@ -6,20 +6,26 @@ import type {
 	JSONRPCRequest,
 	JSONRPCResponse,
 } from "../types";
+import type { createSharedSubscriptionGroup } from "./shared";
 
 export type SharedSubscription = {
 	subscribeLocal(localId: string, downstream: DownstreamClient): void;
 	unsubscribeLocal(localId: string): void;
 	hasLocalSubscription(localId: string): boolean;
 	hasSubscribers(): boolean;
+	subscribersCount(): number;
+	getLocalIds(): string[];
 	upstreamSubId: string;
 };
+
+export type SharedSubscriptionGroup = ReturnType<
+	typeof createSharedSubscriptionGroup
+>;
 
 export type UpstreamServer = {
 	url: string;
 	nextId: number;
-	pending: Map<string, Promise<void>>;
-	subscriptions: Map<string, SharedSubscription>;
+	subscriptions: SharedSubscriptionGroup;
 	unsubscribers: Map<string, () => void>;
 	unsubscribe: (localId: string) => void;
 	message$: Observable<JSONRPCResponse | JSONRPCNotification>;
@@ -28,7 +34,6 @@ export type UpstreamServer = {
 	send(req: JSONRPCRequest): void;
 	isReady(): boolean;
 	connect(): Promise<void>;
-	state: Record<string, unknown>;
 	stop(): void;
 };
 

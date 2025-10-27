@@ -1,10 +1,35 @@
 import { getLogger } from "@logtape/logtape";
-
 import { finalize, type Observable, type Subscription, share } from "rxjs";
+
 import type { DownstreamClient } from "../downstream";
 import type { JSONRPCNotification } from "../types";
+import type { SharedSubscription } from "./types";
 
 const logger = getLogger(["wsmux", "upstream", "shared"]);
+
+/**
+ * Creates a shared subscription group that manages multiple shared subscription pools.
+ */
+export function createSharedSubscriptionGroup() {
+	const groups = new Map<
+		string,
+		ReturnType<typeof createSharedSubscriptionPool>
+	>();
+	return {
+		getOrCreate(key: string, opts: SharedSubscriptionPoolOptions = {}) {
+			if (!groups.has(key)) {
+				const destroy = () => {
+					groups.delete(key);
+				};
+				groups.set(key, createSharedSubscriptionPool({ ...opts, destroy }));
+			}
+			return groups.get(key)!;
+		},
+		get(key: string) {
+			return groups.get(key);
+		},
+	};
+}
 
 /**
  * Creates a shared subscription that fans out an upstream observable
@@ -18,11 +43,11 @@ const logger = getLogger(["wsmux", "upstream", "shared"]);
  * - **Upstream subscription**: Only one exists per `upstreamSubId`, shared among all downstreams.
  * - **Local subscription**: Each downstream client gets its own subscription to the shared upstream.
  */
-export function createSharedSubscription(
+function createSharedSubscription(
 	upstreamSubId: string,
 	source$: Observable<JSONRPCNotification>,
 	destroy: () => Promise<void> | void,
-) {
+): SharedSubscription {
 	const localSubs = new Map<string, Subscription>();
 	const shared$ = source$.pipe(
 		finalize(async () => {
@@ -36,8 +61,9 @@ export function createSharedSubscription(
 			localSubs.clear();
 			try {
 				await destroy();
-			} catch (err) {
-				logger.error("upstream destroy failed", { err });
+			} catch {
+				// TODO: all awaiting replies must be canceled upon closing.
+				// logger.error("upstream destroy failed", { error });
 			}
 		}),
 		share(),
@@ -47,12 +73,15 @@ export function createSharedSubscription(
 		hasLocalSubscription(localId: string) {
 			return localSubs.has(localId);
 		},
+		getLocalIds() {
+			return Array.from(localSubs.keys());
+		},
 		subscribeLocal(localId: string, downstream: DownstreamClient) {
 			if (this.hasLocalSubscription(localId)) {
 				throw Error(`Subscription with ID ${localId} already exists`);
 			}
 
-			downstream.addCloseListener(() => {
+			downstream.addCloseFn(() => {
 				this.unsubscribeLocal(localId);
 			});
 
@@ -85,8 +114,132 @@ export function createSharedSubscription(
 
 		upstreamSubId,
 
+		subscribersCount() {
+			return localSubs.size;
+		},
+
 		hasSubscribers() {
 			return localSubs.size > 0;
+		},
+	};
+}
+
+export type SharedSubscriptionPoolOptions = {
+	maxSubscribers?: number;
+	destroy?: () => void;
+};
+
+/**
+ * Fully encapsulated pool of shared subscriptions per method.
+ * Tracks least-loaded subscriptions and localId → SharedSubscription mapping for O(1) lookup.
+ */
+function createSharedSubscriptionPool({
+	maxSubscribers: maxSubscriptions = 10,
+	destroy,
+}: SharedSubscriptionPoolOptions) {
+	const subscriptions = new Map<string, SharedSubscription>();
+	const localIdIndex = new Map<string, SharedSubscription>();
+	let leastLoaded: [string, SharedSubscription] | undefined;
+
+	return {
+		getByLocalId(localId: string) {
+			return localIdIndex.get(localId);
+		},
+		getLeastLoaded(): [string, SharedSubscription] | undefined {
+			return leastLoaded;
+		},
+		size() {
+			return subscriptions.size;
+		},
+		canCreateNew(selected?: [string, SharedSubscription]) {
+			return (
+				(!selected || selected[1].subscribersCount() > 0) &&
+				this.size() < maxSubscriptions
+			);
+		},
+		set(key: string, sub: SharedSubscription) {
+			const origSubscribe = sub.subscribeLocal.bind(sub);
+			// TODO: we are recalculating iterating by all subs, potential performance issue
+			// consider using a min heap or priority queue to keep track of the least loaded subscription
+			sub.subscribeLocal = (localId: string, downstream: DownstreamClient) => {
+				origSubscribe(localId, downstream);
+				localIdIndex.set(localId, sub);
+
+				let min: [string, SharedSubscription] | undefined;
+				for (const entry of subscriptions) {
+					if (!min || entry[1].subscribersCount() < min[1].subscribersCount()) {
+						min = entry;
+					}
+				}
+				leastLoaded = min;
+			};
+
+			const origUnsubscribe = sub.unsubscribeLocal.bind(sub);
+			sub.unsubscribeLocal = (localId: string) => {
+				origUnsubscribe(localId);
+				localIdIndex.delete(localId);
+
+				let min: [string, SharedSubscription] | undefined;
+				for (const entry of subscriptions) {
+					if (!min || entry[1].subscribersCount() < min[1].subscribersCount()) {
+						min = entry;
+					}
+				}
+				leastLoaded = min;
+			};
+
+			subscriptions.set(key, sub);
+
+			const count = sub.subscribersCount();
+			if (!leastLoaded || count < leastLoaded[1].subscribersCount()) {
+				leastLoaded = [key, sub];
+			}
+		},
+		remove(key: string) {
+			const wasLeast = leastLoaded?.[0] === key;
+			const sub = subscriptions.get(key);
+			if (sub) {
+				for (const localId of sub.getLocalIds()) {
+					localIdIndex.delete(localId);
+				}
+			}
+			subscriptions.delete(key);
+
+			if (wasLeast) {
+				let min: [string, SharedSubscription] | undefined;
+				for (const entry of subscriptions) {
+					if (!min || entry[1].subscribersCount() < min[1].subscribersCount())
+						min = entry;
+				}
+				leastLoaded = min;
+			}
+
+			if (subscriptions.size === 0 && destroy) {
+				destroy();
+			}
+		},
+
+		/**
+		 * Factory: create a shared subscription for this pool
+		 * - source$ is upstream observable
+		 * - destroy is cleanup callback
+		 */
+		createShared(
+			key: string,
+			upstreamSubId: string,
+			source$: Observable<JSONRPCNotification>,
+			destroy: () => Promise<void> | void,
+		): SharedSubscription {
+			const shared = createSharedSubscription(
+				upstreamSubId,
+				source$,
+				async () => {
+					await destroy();
+					this.remove(key);
+				},
+			);
+			this.set(key, shared);
+			return shared;
 		},
 	};
 }
