@@ -15,12 +15,8 @@ export const forwardChainHeadHandler: JSONRPCMethodHandler = {
 		}
 
 		const shared = upstream.subscriptions
-			.entries()
-			.find(
-				([key, s]) =>
-					key.startsWith("chainHead_v1_follow") &&
-					s.hasLocalSubscription(localId),
-			)?.[1];
+			.get("chainHead_v1_follow")
+			?.getByLocalId(localId);
 
 		if (!shared) {
 			downstream.send(

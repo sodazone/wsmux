@@ -270,3 +270,19 @@ export function createStateManager() {
 		replay,
 	};
 }
+
+export function createStateMap() {
+	const stateManagers = new Map<string, StateManager>();
+	return {
+		getOrCreate(key: string): StateManager {
+			if (!stateManagers.has(key)) {
+				const stateManager = createStateManager();
+				stateManagers.set(key, stateManager);
+			}
+			return stateManagers.get(key)!;
+		},
+		remove(key: string) {
+			stateManagers.delete(key);
+		},
+	};
+}

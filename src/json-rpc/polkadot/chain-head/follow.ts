@@ -1,53 +1,26 @@
 import { getLogger } from "@logtape/logtape";
 import { filter, map } from "rxjs";
 
+import {
+	createConcurrentCreator,
+	TooManyWaitersError,
+} from "../../../concurrency/creator";
 import { jsonRpcError } from "../../errors";
 import type { JSONRPCMethodHandler } from "../../methods";
 import type { JSONRPCNotification } from "../../types";
-import { createSharedSubscription } from "../../upstream/shared";
-import { createStateManager, type StateManager } from "./state";
+import type { SharedSubscription } from "../../upstream";
+import { createStateMap } from "./state";
 
 const logger = getLogger("wsmux.chainhead.follow");
 const MAX_FOLLOWS_PER_UPSTREAM = 2;
 
 export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
-	const creatingFollows = new Map<string, Promise<void>>();
-
-	async function getOrCreateFollow(
-		followKey: string,
-		createFn: () => Promise<void>,
-	) {
-		if (!creatingFollows.has(followKey)) {
-			const p = createFn();
-			creatingFollows.set(followKey, p);
-			try {
-				await p;
-				return true;
-			} finally {
-				creatingFollows.delete(followKey);
-			}
-		} else {
-			await creatingFollows.get(followKey)!;
-			return false;
-		}
-	}
-
-	function createStateMap() {
-		const stateManagers = new Map<string, StateManager>();
-		return {
-			getOrCreate(key: string): StateManager {
-				if (!stateManagers.has(key)) {
-					const stateManager = createStateManager();
-					stateManagers.set(key, stateManager);
-				}
-				return stateManagers.get(key)!;
-			},
-			remove(key: string) {
-				stateManagers.delete(key);
-			},
-		};
-	}
 	const state = createStateMap();
+
+	const getOrCreateFollow = createConcurrentCreator({
+		maxWaiting: 5,
+		label: "chainHead_v1_follow",
+	});
 
 	return {
 		async handleRequest(upstream, downstream, request) {
@@ -56,29 +29,43 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 
 			logger.info((l) => l`Follow request from ${clientId}`);
 
-			const follows = Array.from(upstream.subscriptions.entries()).filter(
-				([k]) => k.startsWith(methodKey),
-			);
+			const chainHeadSubs = upstream.subscriptions.getOrCreate(methodKey, {
+				maxSubscribers: MAX_FOLLOWS_PER_UPSTREAM,
+			});
+			const selected = chainHeadSubs.getLeastLoaded();
 
-			let selected = follows.length
-				? follows.reduce((a, b) =>
-						a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
-					)
-				: undefined;
-
-			if (
-				(!selected || selected[1].subscribersCount() > 0) &&
-				follows.length < MAX_FOLLOWS_PER_UPSTREAM
+			async function assignToDownstream(
+				shared: SharedSubscription,
+				followKey: string,
 			) {
-				const followIndex = follows.length;
+				logger.info(
+					(l) =>
+						l`Assigning ${clientId} to ${followKey} (${shared.subscribersCount()} subs)`,
+				);
+
+				const localId = downstream.getLocalId(shared.upstreamSubId);
+				downstream.send({
+					jsonrpc: "2.0",
+					id: request.id ?? null,
+					result: localId,
+				});
+				shared.subscribeLocal(localId, downstream);
+				upstream.unsubscribers.set(localId, () =>
+					shared.unsubscribeLocal(localId),
+				);
+				await state.getOrCreate(followKey).replay(downstream, localId);
+			}
+
+			if (chainHeadSubs.canCreateNew(selected)) {
+				const followIndex = chainHeadSubs.size();
 				const followKey = `${methodKey}:${followIndex}`;
 
-				const created = await getOrCreateFollow(followKey, async () => {
-					logger.info(
-						(l) =>
-							l`[Follow] Creating upstream follow ${followKey} (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
-					);
-					try {
+				try {
+					const shared = await getOrCreateFollow(followKey, async () => {
+						logger.info(
+							(l) =>
+								l`[Follow] Creating upstream follow ${followKey} (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
+						);
 						const { result: upstreamSubId } = (await upstream.request({
 							...request,
 							params: [true],
@@ -87,7 +74,8 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 
 						const snapshot = state.getOrCreate(followKey);
 
-						const shared = createSharedSubscription(
+						const shared = chainHeadSubs.createShared(
+							followKey,
 							upstreamSubId,
 							snapshot.withUpdate(
 								upstream.message$.pipe(
@@ -109,24 +97,24 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 									method: "chainHead_v1_unfollow",
 									params: [upstreamSubId],
 								});
-								upstream.subscriptions.delete(followKey);
 								state.remove(followKey);
 							},
 						);
 
-						upstream.subscriptions.set(followKey, shared);
-						const localId = downstream.getLocalId(upstreamSubId);
-						downstream.send({ ...request, result: localId });
-						shared.subscribeLocal(localId, downstream);
-						upstream.unsubscribers.set(localId, () =>
-							shared.unsubscribeLocal(localId),
+						return shared;
+					});
+					await assignToDownstream(shared, followKey);
+					return;
+				} catch (err) {
+					if (err instanceof TooManyWaitersError) {
+						downstream.send(
+							jsonRpcError({
+								kind: "RATE_LIMITED",
+								message: "Backpressure: too many concurrent requests",
+								req: request,
+							}),
 						);
-						await snapshot.replay(downstream, localId);
-						logger.info(
-							(l) =>
-								l`[Follow] New follow ${followKey} assigned to ${clientId}`,
-						);
-					} catch (err) {
+					} else {
 						logger.error((l) => l`[Follow] Error creating follow: ${err}`);
 						downstream.send(
 							jsonRpcError({
@@ -136,22 +124,9 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							}),
 						);
 					}
-				});
-				if (!created) {
-					downstream.send(
-						jsonRpcError({
-							kind: "RATE_LIMITED",
-							message: "Backpressure for reassignment",
-							req: request,
-						}),
-					);
 				}
 				return;
 			}
-
-			selected = follows.reduce((a, b) =>
-				a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
-			);
 
 			if (!selected) {
 				downstream.send(
@@ -165,24 +140,10 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 			}
 
 			const [followKey, shared] = selected;
-			const snapshot = state.getOrCreate(followKey);
 			const localId = downstream.getLocalId(shared.upstreamSubId);
-			if (shared.hasLocalSubscription(localId)) return;
-
-			logger.info(
-				(l) =>
-					l`[Reuse] Assigning ${clientId} to ${followKey} (${shared.subscribersCount()} subs)`,
-			);
-			downstream.send({
-				jsonrpc: "2.0",
-				id: request.id ?? null,
-				result: localId,
-			});
-			await snapshot.replay(downstream, localId);
-			shared.subscribeLocal(localId, downstream);
-			upstream.unsubscribers.set(localId, () =>
-				shared.unsubscribeLocal(localId),
-			);
+			if (!shared.hasLocalSubscription(localId)) {
+				await assignToDownstream(shared, followKey);
+			}
 		},
 	};
 };
