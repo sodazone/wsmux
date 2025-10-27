@@ -11,7 +11,7 @@ export type DownstreamMessage =
 	| JSONRPCError;
 
 export type DownstreamClient = {
-	clientId: string;
+	clientId: number;
 	pendingRequests: number;
 	lastRequestTimes: number[];
 	getLocalId(suffix: string): string;

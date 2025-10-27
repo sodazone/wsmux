@@ -16,7 +16,6 @@
 	},
 	"dependencies": {
 		"@logtape/logtape": "^1.1.2",
-		"rxjs": "^7.8.2",
-		"ulid": "^3.0.1"
+		"rxjs": "^7.8.2"
 	}
 }
