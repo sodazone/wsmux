@@ -115,7 +115,12 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							}),
 						);
 					} else {
-						logger.error((l) => l`[Follow] Error creating follow: ${err}`);
+						logger.error("[Follow] Error creating follow", {
+							error: err,
+							clientId,
+							followKey,
+						});
+
 						downstream.send(
 							jsonRpcError({
 								kind: "INTERNAL_ERROR",
