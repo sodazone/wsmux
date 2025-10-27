@@ -173,8 +173,8 @@ function createStateManager() {
 	}
 
 	async function replay(
-		client: { send: (msg: JSONRPCNotification) => void },
 		clientSubId: string,
+		client: { send: (msg: JSONRPCNotification) => void },
 	) {
 		if (!snapshot.initialized) {
 			logger.debug("Replay requested before initialization, waiting...");

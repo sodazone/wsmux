@@ -11,6 +11,7 @@ import type {
 	SharedSubscriptionPool,
 } from "../../upstream";
 import { createStateMap } from "./state";
+import { followNotifyTransform } from "./transform";
 
 const logger = getLogger("wsmux.chainhead.follow");
 const MAX_FOLLOWS_PER_UPSTREAM = 2;
@@ -51,11 +52,15 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					id: request.id ?? null,
 					result: localId,
 				});
-				shared.subscribeLocal(localId, downstream);
+				shared.subscribeLocal(
+					localId,
+					downstream,
+					followNotifyTransform(request),
+				);
 				upstream.unsubscribers.set(localId, () =>
 					shared.unsubscribeLocal(localId),
 				);
-				await state.get(followKey)?.replay(downstream, localId);
+				await state.get(followKey)?.replay(localId, downstream);
 			}
 
 			if (chainHeadSubs.canCreateNew(selected)) {

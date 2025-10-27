@@ -1,5 +1,12 @@
 import { getLogger } from "@logtape/logtape";
-import { finalize, type Observable, type Subscription, share } from "rxjs";
+import {
+	finalize,
+	identity,
+	map,
+	type Observable,
+	type Subscription,
+	share,
+} from "rxjs";
 
 import type { DownstreamClient } from "../downstream";
 import type { JSONRPCNotification } from "../types";
@@ -60,14 +67,20 @@ function createSharedSubscription(
 	source$: Observable<JSONRPCNotification>,
 	destroy: () => Promise<void> | void,
 ): SharedSubscription {
-	const localSubs = new Map<string, Subscription>();
+	const localSubs = new Map<
+		string,
+		{
+			subscription: Subscription;
+			transform?: (notif: JSONRPCNotification) => JSONRPCNotification;
+		}
+	>();
 	const shared$ = source$.pipe(
 		finalize(async () => {
 			if (localSubs.size === 0) {
 				return;
 			}
 
-			localSubs.forEach((subscription) => {
+			localSubs.forEach(({ subscription }) => {
 				subscription.unsubscribe();
 			});
 			localSubs.clear();
@@ -88,7 +101,11 @@ function createSharedSubscription(
 		getLocalIds() {
 			return Array.from(localSubs.keys());
 		},
-		subscribeLocal(localId: string, downstream: DownstreamClient) {
+		subscribeLocal(
+			localId: string,
+			downstream: DownstreamClient,
+			transform?: (notif: JSONRPCNotification) => JSONRPCNotification,
+		) {
 			if (this.hasLocalSubscription(localId)) {
 				throw Error(`Subscription with ID ${localId} already exists`);
 			}
@@ -97,7 +114,7 @@ function createSharedSubscription(
 				this.unsubscribeLocal(localId);
 			});
 
-			const subscription = shared$.subscribe({
+			const subscription = shared$.pipe(map(transform ?? identity)).subscribe({
 				next: (notif) => {
 					try {
 						downstream.send({
@@ -115,12 +132,15 @@ function createSharedSubscription(
 					}
 				},
 			});
-			localSubs.set(localId, subscription);
+			localSubs.set(localId, {
+				subscription,
+				transform,
+			});
 		},
 
 		unsubscribeLocal(localId: string) {
 			const sub = localSubs.get(localId);
-			if (sub) sub.unsubscribe();
+			if (sub) sub.subscription.unsubscribe();
 			localSubs.delete(localId);
 		},
 
