@@ -10,28 +10,28 @@ import { createStateManager, type StateManager } from "./state";
 const logger = getLogger("wsmux.chainhead.follow");
 const MAX_FOLLOWS_PER_UPSTREAM = 2;
 
-const creatingFollows = new Map<string, Promise<void>>();
-
-async function getOrCreateFollow(
-	followKey: string,
-	createFn: () => Promise<void>,
-) {
-	if (!creatingFollows.has(followKey)) {
-		const p = createFn();
-		creatingFollows.set(followKey, p);
-		try {
-			await p;
-			return true;
-		} finally {
-			creatingFollows.delete(followKey);
-		}
-	} else {
-		await creatingFollows.get(followKey)!;
-		return false;
-	}
-}
-
 export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
+	const creatingFollows = new Map<string, Promise<void>>();
+
+	async function getOrCreateFollow(
+		followKey: string,
+		createFn: () => Promise<void>,
+	) {
+		if (!creatingFollows.has(followKey)) {
+			const p = createFn();
+			creatingFollows.set(followKey, p);
+			try {
+				await p;
+				return true;
+			} finally {
+				creatingFollows.delete(followKey);
+			}
+		} else {
+			await creatingFollows.get(followKey)!;
+			return false;
+		}
+	}
+
 	function createStateMap() {
 		const stateManagers = new Map<string, StateManager>();
 		return {
