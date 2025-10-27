@@ -77,7 +77,6 @@ export function createUpstreamServer({
 		supportedMethods,
 		subscriptions: new Map<string, SharedSubscription>(),
 		unsubscribers,
-		state: {},
 		message$,
 
 		isReady: () => {

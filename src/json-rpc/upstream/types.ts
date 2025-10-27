@@ -28,7 +28,6 @@ export type UpstreamServer = {
 	send(req: JSONRPCRequest): void;
 	isReady(): boolean;
 	connect(): Promise<void>;
-	state: Record<string, unknown>;
 	stop(): void;
 };
 

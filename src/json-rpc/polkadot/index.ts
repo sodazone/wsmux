@@ -12,8 +12,8 @@ export const polkadotMethods = {
 			downstream.send(response);
 		},
 	},
-	chainHead_v1_follow,
-	chainHead_v1_unfollow,
+	chainHead_v1_follow: chainHead_v1_follow(),
+	chainHead_v1_unfollow: chainHead_v1_unfollow,
 	chainHead_v1_header: forwardChainHeadHandler,
 	chainHead_v1_storage: forwardChainHeadHandler,
 	chainHead_v1_body: forwardChainHeadHandler,

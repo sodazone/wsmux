@@ -31,139 +31,160 @@ async function getOrCreateFollow(
 	}
 }
 
-export const chainHead_v1_follow: JSONRPCMethodHandler = {
-	async handleRequest(upstream, downstream, request) {
-		const methodKey = "chainHead_v1_follow";
-		const clientId = downstream.clientId;
+export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
+	function createStateMap() {
+		const stateManagers = new Map<string, StateManager>();
+		return {
+			getOrCreate(key: string): StateManager {
+				if (!stateManagers.has(key)) {
+					const stateManager = createStateManager();
+					stateManagers.set(key, stateManager);
+				}
+				return stateManagers.get(key)!;
+			},
+			remove(key: string) {
+				stateManagers.delete(key);
+			},
+		};
+	}
+	const state = createStateMap();
 
-		logger.info((l) => l`Follow request from ${clientId}`);
+	return {
+		async handleRequest(upstream, downstream, request) {
+			const methodKey = "chainHead_v1_follow";
+			const clientId = downstream.clientId;
 
-		const follows = Array.from(upstream.subscriptions.entries()).filter(([k]) =>
-			k.startsWith(methodKey),
-		);
+			logger.info((l) => l`Follow request from ${clientId}`);
 
-		let selected = follows.length
-			? follows.reduce((a, b) =>
-					a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
-				)
-			: undefined;
+			const follows = Array.from(upstream.subscriptions.entries()).filter(
+				([k]) => k.startsWith(methodKey),
+			);
 
-		if (
-			(!selected || selected[1].subscribersCount() > 0) &&
-			follows.length < MAX_FOLLOWS_PER_UPSTREAM
-		) {
-			const followIndex = follows.length;
-			const followKey = `${methodKey}:${followIndex}`;
+			let selected = follows.length
+				? follows.reduce((a, b) =>
+						a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
+					)
+				: undefined;
 
-			const created = await getOrCreateFollow(followKey, async () => {
-				logger.info(
-					(l) =>
-						l`[Follow] Creating upstream follow ${followKey} (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
-				);
-				try {
-					const { result: upstreamSubId } = (await upstream.request({
-						...request,
-						params: [true],
-					})) as { result: string };
-					if (!upstreamSubId) throw new Error("No upstreamSubId in response");
+			if (
+				(!selected || selected[1].subscribersCount() > 0) &&
+				follows.length < MAX_FOLLOWS_PER_UPSTREAM
+			) {
+				const followIndex = follows.length;
+				const followKey = `${methodKey}:${followIndex}`;
 
-					const snapshot = createStateManager();
-					upstream.state[followKey] = snapshot;
-
-					const shared = createSharedSubscription(
-						upstreamSubId,
-						snapshot.withUpdate(
-							upstream.message$.pipe(
-								filter(
-									(msg) =>
-										"method" in msg &&
-										msg.method === "chainHead_v1_followEvent" &&
-										msg.params?.subscription === upstreamSubId,
-								),
-								map((msg) => msg as JSONRPCNotification),
-							),
-						),
-						async () => {
-							logger.info(
-								(l) => l`[Follow] Unfollowed upstream ${upstreamSubId}`,
-							);
-							await upstream.request({
-								jsonrpc: "2.0",
-								method: "chainHead_v1_unfollow",
-								params: [upstreamSubId],
-							});
-							upstream.subscriptions.delete(followKey);
-							delete upstream.state[followKey];
-						},
-					);
-
-					upstream.subscriptions.set(followKey, shared);
-					const localId = downstream.getLocalId(upstreamSubId);
-					downstream.send({ ...request, result: localId });
-					shared.subscribeLocal(localId, downstream);
-					upstream.unsubscribers.set(localId, () =>
-						shared.unsubscribeLocal(localId),
-					);
-					await snapshot.replay(downstream, localId);
+				const created = await getOrCreateFollow(followKey, async () => {
 					logger.info(
-						(l) => l`[Follow] New follow ${followKey} assigned to ${clientId}`,
+						(l) =>
+							l`[Follow] Creating upstream follow ${followKey} (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
 					);
-				} catch (err) {
-					logger.error((l) => l`[Follow] Error creating follow: ${err}`);
+					try {
+						const { result: upstreamSubId } = (await upstream.request({
+							...request,
+							params: [true],
+						})) as { result: string };
+						if (!upstreamSubId) throw new Error("No upstreamSubId in response");
+
+						const snapshot = state.getOrCreate(followKey);
+
+						const shared = createSharedSubscription(
+							upstreamSubId,
+							snapshot.withUpdate(
+								upstream.message$.pipe(
+									filter(
+										(msg) =>
+											"method" in msg &&
+											msg.method === "chainHead_v1_followEvent" &&
+											msg.params?.subscription === upstreamSubId,
+									),
+									map((msg) => msg as JSONRPCNotification),
+								),
+							),
+							async () => {
+								logger.info(
+									(l) => l`[Follow] Unfollowed upstream ${upstreamSubId}`,
+								);
+								await upstream.request({
+									jsonrpc: "2.0",
+									method: "chainHead_v1_unfollow",
+									params: [upstreamSubId],
+								});
+								upstream.subscriptions.delete(followKey);
+								state.remove(followKey);
+							},
+						);
+
+						upstream.subscriptions.set(followKey, shared);
+						const localId = downstream.getLocalId(upstreamSubId);
+						downstream.send({ ...request, result: localId });
+						shared.subscribeLocal(localId, downstream);
+						upstream.unsubscribers.set(localId, () =>
+							shared.unsubscribeLocal(localId),
+						);
+						await snapshot.replay(downstream, localId);
+						logger.info(
+							(l) =>
+								l`[Follow] New follow ${followKey} assigned to ${clientId}`,
+						);
+					} catch (err) {
+						logger.error((l) => l`[Follow] Error creating follow: ${err}`);
+						downstream.send(
+							jsonRpcError({
+								kind: "INTERNAL_ERROR",
+								message: String(err),
+								req: request,
+							}),
+						);
+					}
+				});
+				if (!created) {
 					downstream.send(
 						jsonRpcError({
-							kind: "INTERNAL_ERROR",
-							message: String(err),
+							kind: "RATE_LIMITED",
+							message: "Backpressure for reassignment",
 							req: request,
 						}),
 					);
 				}
-			});
-			if (!created) {
+				return;
+			}
+
+			selected = follows.reduce((a, b) =>
+				a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
+			);
+
+			if (!selected) {
 				downstream.send(
 					jsonRpcError({
 						kind: "RATE_LIMITED",
-						message: "Backpressure for reassignment",
+						message: "No available follows",
 						req: request,
 					}),
 				);
+				return;
 			}
-			return;
-		}
 
-		selected = follows.reduce((a, b) =>
-			a[1].subscribersCount() < b[1].subscribersCount() ? a : b,
-		);
+			const [followKey, shared] = selected;
+			const snapshot = state.getOrCreate(followKey);
+			const localId = downstream.getLocalId(shared.upstreamSubId);
+			if (shared.hasLocalSubscription(localId)) return;
 
-		if (!selected) {
-			downstream.send(
-				jsonRpcError({
-					kind: "RATE_LIMITED",
-					message: "No available follows",
-					req: request,
-				}),
+			logger.info(
+				(l) =>
+					l`[Reuse] Assigning ${clientId} to ${followKey} (${shared.subscribersCount()} subs)`,
 			);
-			return;
-		}
-
-		const [followKey, shared] = selected;
-		const snapshot = upstream.state[followKey] as StateManager;
-		const localId = downstream.getLocalId(shared.upstreamSubId);
-		if (shared.hasLocalSubscription(localId)) return;
-
-		logger.info(
-			(l) =>
-				l`[Reuse] Assigning ${clientId} to ${followKey} (${shared.subscribersCount()} subs)`,
-		);
-		downstream.send({
-			jsonrpc: "2.0",
-			id: request.id ?? null,
-			result: localId,
-		});
-		await snapshot.replay(downstream, localId);
-		shared.subscribeLocal(localId, downstream);
-		upstream.unsubscribers.set(localId, () => shared.unsubscribeLocal(localId));
-	},
+			downstream.send({
+				jsonrpc: "2.0",
+				id: request.id ?? null,
+				result: localId,
+			});
+			await snapshot.replay(downstream, localId);
+			shared.subscribeLocal(localId, downstream);
+			upstream.unsubscribers.set(localId, () =>
+				shared.unsubscribeLocal(localId),
+			);
+		},
+	};
 };
 
 export const chainHead_v1_unfollow: JSONRPCMethodHandler = {
