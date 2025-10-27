@@ -89,9 +89,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 								),
 							),
 							async () => {
-								logger.info(
-									(l) => l`[Follow] Unfollowed upstream ${upstreamSubId}`,
-								);
+								logger.info((l) => l`Unfollowed upstream ${upstreamSubId}`);
 								await upstream.request({
 									jsonrpc: "2.0",
 									method: "chainHead_v1_unfollow",
