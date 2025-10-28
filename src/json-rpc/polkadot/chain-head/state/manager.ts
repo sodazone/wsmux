@@ -101,11 +101,7 @@ export function createStateManager() {
 				catchError(() => of(null)),
 			);
 
-			if (waitInit === null) {
-				// TODO: recover
-				throw new Error("Initialization failed");
-			}
-
+			// TODO: recover from error or timeout
 			const replay$ = waitInit.pipe(
 				map(() => [
 					{
