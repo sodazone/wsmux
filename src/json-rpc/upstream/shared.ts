@@ -120,7 +120,7 @@ function createSharedSubscription(
 			localSubs.delete(localId);
 
 			if (localSubs.size === 0) {
-				destroy()
+				void destroy()
 					.then(() => {
 						logger.info(
 							"destroyed shared subscription pool for {upstreamSubId}",
@@ -129,15 +129,7 @@ function createSharedSubscription(
 							},
 						);
 					})
-					.catch((err) => {
-						logger.error(
-							"failed to destroy shared subscription pool for {upstreamSubId} {err}",
-							{
-								upstreamSubId,
-								err,
-							},
-						);
-					});
+					.catch(() => {});
 			}
 		},
 
