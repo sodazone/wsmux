@@ -1,5 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-import { concat, from, Observable, of, ReplaySubject } from "rxjs";
+import { concat, EMPTY, from, Observable, of, ReplaySubject } from "rxjs";
 import {
 	catchError,
 	filter,
@@ -128,7 +128,11 @@ export function createStateManager() {
 			refCount++;
 			const sub = waitInit$
 				.pipe(
-					switchMap(() => {
+					switchMap((init) => {
+						if (!init) {
+							return EMPTY;
+						}
+
 						const replayEvents = snapshotEvents(upstreamSubId);
 						return concat(from(replayEvents), live$);
 					}),
