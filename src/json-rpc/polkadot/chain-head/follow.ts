@@ -10,15 +10,16 @@ import type {
 	SharedSubscription,
 	SharedSubscriptionPool,
 } from "../../upstream";
-import { createStateMap } from "./state";
+import type { ChainHeadState } from "./state";
 import { followNotifyTransform } from "./transform";
 
 const logger = getLogger("wsmux.chainhead.follow");
 const MAX_FOLLOWS_PER_UPSTREAM = 2;
 
-export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
+export const chainHead_v1_follow = ({
+	managers,
+}: ChainHeadState): JSONRPCMethodHandler => {
 	const methodKey = "chainHead_v1_follow";
-	const state = createStateMap();
 
 	const getOrCreateFollow = createConcurrentCreator({
 		maxWaiting: 5,
@@ -57,13 +58,14 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					downstream,
 					followNotifyTransform(request),
 				);
-				upstream.unsubscribers.set(localId, () =>
-					shared.unsubscribeLocal(localId),
-				);
-				await state.get(followKey)?.replay(localId, downstream);
+				upstream.unsubscribers.set(localId, () => {
+					// TODO: unpin cleanup
+					// unpinCleanup(localId, shared, upstream); <- impl in unpin
+					shared.unsubscribeLocal(localId);
+				});
 			}
 
-			if (chainHeadSubs.canCreateNew(selected)) {
+			if (chainHeadSubs.shouldCreateMore(selected)) {
 				const followIndex = chainHeadSubs.size();
 				const followKey = `${methodKey}:${followIndex}`;
 
@@ -79,7 +81,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 						})) as { result: string };
 						if (!upstreamSubId) throw new Error("No upstreamSubId in response");
 
-						return state.create(
+						return managers.createSharedSubscription(
 							followKey,
 							upstream,
 							upstreamSubId,

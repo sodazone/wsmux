@@ -98,9 +98,11 @@ function createSharedSubscription(
 		hasLocalSubscription(localId: string) {
 			return localSubs.has(localId);
 		},
+
 		getLocalIds() {
 			return Array.from(localSubs.keys());
 		},
+
 		subscribeLocal(
 			localId: string,
 			downstream: DownstreamClient,
@@ -177,18 +179,22 @@ function createSharedSubscriptionPool(
 		getByLocalId(localId: string) {
 			return localIdIndex.get(localId);
 		},
+
 		getLeastLoaded(): [string, SharedSubscription] | undefined {
 			return leastLoaded;
 		},
+
 		size() {
 			return subscriptions.size;
 		},
-		canCreateNew(selected?: [string, SharedSubscription]) {
+
+		shouldCreateMore(selected?: [string, SharedSubscription]) {
 			return (
 				(!selected || selected[1].subscribersCount() > 0) &&
 				this.size() < maxSubscriptions
 			);
 		},
+
 		set(key: string, sub: SharedSubscription) {
 			const origSubscribe = sub.subscribeLocal.bind(sub);
 			// TODO: we are recalculating iterating by all subs, potential performance issue
@@ -227,6 +233,7 @@ function createSharedSubscriptionPool(
 				leastLoaded = [key, sub];
 			}
 		},
+
 		remove(key: string) {
 			const wasLeast = leastLoaded?.[0] === key;
 			const sub = subscriptions.get(key);
