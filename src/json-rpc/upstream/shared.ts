@@ -44,108 +44,6 @@ export function createSharedSubscriptionGroup() {
 }
 
 /**
- * Creates a shared subscription that fans out an upstream observable
- * to multiple downstream clients, maintaining independent local subscriptions.
- *
- * - `upstreamSubId` is the identifier of the upstream subscription.
- * - `source$` is the shared upstream observable stream.
- * - `destroy` is a cleanup callback invoked once the upstream is no longer needed.
- *
- * Local vs. upstream subscriptions:
- * - **Upstream subscription**: Only one exists per `upstreamSubId`, shared among all downstreams.
- * - **Local subscription**: Each downstream client gets its own subscription to the shared upstream.
- */
-function createSharedSubscription(
-	upstreamSubId: string,
-	source$: Observable<JSONRPCNotification>,
-	destroy: () => Promise<void> | void,
-): SharedSubscription {
-	const localSubs = new Map<
-		string,
-		{
-			subscription: Subscription;
-			transform?: (notif: JSONRPCNotification) => JSONRPCNotification;
-		}
-	>();
-	return {
-		hasLocalSubscription(localId: string) {
-			return localSubs.has(localId);
-		},
-
-		getLocalIds() {
-			return Array.from(localSubs.keys());
-		},
-
-		subscribeLocal(
-			localId: string,
-			downstream: DownstreamClient,
-			transform?: (notif: JSONRPCNotification) => JSONRPCNotification,
-		) {
-			if (this.hasLocalSubscription(localId)) {
-				throw Error(`Subscription with ID ${localId} already exists`);
-			}
-
-			downstream.addCloseFn(() => {
-				this.unsubscribeLocal(localId);
-			});
-
-			const subscription = source$.pipe(map(transform ?? identity)).subscribe({
-				next: (notif) => {
-					try {
-						downstream.send({
-							...notif,
-							params: {
-								...notif.params,
-								subscription: localId,
-							},
-						});
-					} catch (err) {
-						logger.warn("failed to send downstream for {localId}", {
-							localId,
-							err,
-						});
-					}
-				},
-			});
-
-			localSubs.set(localId, {
-				subscription,
-				transform,
-			});
-		},
-
-		unsubscribeLocal(localId: string) {
-			const sub = localSubs.get(localId);
-			if (sub) sub.subscription.unsubscribe();
-			localSubs.delete(localId);
-
-			if (localSubs.size === 0) {
-				void destroy()
-					.then(() => {
-						logger.info(
-							"destroyed shared subscription pool for {upstreamSubId}",
-							{
-								upstreamSubId,
-							},
-						);
-					})
-					.catch(() => {});
-			}
-		},
-
-		upstreamSubId,
-
-		subscribersCount() {
-			return localSubs.size;
-		},
-
-		hasSubscribers() {
-			return localSubs.size > 0;
-		},
-	};
-}
-
-/**
  * Pool of shared subscriptions per method.
  * Tracks least-loaded subscriptions and localId to SharedSubscription mapping for O(1) lookup.
  */
@@ -250,13 +148,13 @@ function createSharedSubscriptionPool(
 		 * - source$ is upstream observable
 		 * - destroy is cleanup callback
 		 */
-		createShared(
+		createSharedSubscription(
 			key: string,
 			upstreamSubId: string,
 			source$: Observable<JSONRPCNotification>,
 			destroy: () => Promise<void> | void,
 		): SharedSubscription {
-			const shared = createSharedSubscription(
+			const shared = _createSharedSubscription(
 				upstreamSubId,
 				source$,
 				async () => {
@@ -266,6 +164,111 @@ function createSharedSubscriptionPool(
 			);
 			this.set(key, shared);
 			return shared;
+		},
+	};
+}
+
+/**
+ * Creates a shared subscription that fans out an upstream observable
+ * to multiple downstream clients, maintaining independent local subscriptions.
+ *
+ * - `upstreamSubId` is the identifier of the upstream subscription.
+ * - `source$` is the shared upstream observable stream.
+ * - `destroy` is a cleanup callback invoked once the upstream is no longer needed.
+ *
+ * Local vs. upstream subscriptions:
+ * - **Upstream subscription**: Only one exists per `upstreamSubId`, shared among all downstreams.
+ * - **Local subscription**: Each downstream client gets its own subscription to the shared upstream.
+ */
+function _createSharedSubscription(
+	upstreamSubId: string,
+	source$: Observable<JSONRPCNotification>,
+	destroy: () => Promise<void> | void,
+): SharedSubscription {
+	const localSubs = new Map<
+		string,
+		{
+			subscription: Subscription;
+			transform?: (notif: JSONRPCNotification) => JSONRPCNotification;
+		}
+	>();
+	return {
+		hasLocalSubscription(localId: string) {
+			return localSubs.has(localId);
+		},
+
+		getLocalIds() {
+			return Array.from(localSubs.keys());
+		},
+
+		subscribeLocal(
+			localId: string,
+			downstream: DownstreamClient,
+			transform?: (notif: JSONRPCNotification) => JSONRPCNotification,
+		) {
+			if (this.hasLocalSubscription(localId)) {
+				throw Error(`Subscription with ID ${localId} already exists`);
+			}
+
+			downstream.addCloseFn(() => {
+				this.unsubscribeLocal(localId);
+			});
+
+			const subscription = source$.pipe(map(transform ?? identity)).subscribe({
+				next: (notif) => {
+					try {
+						downstream.send({
+							...notif,
+							params: {
+								...notif.params,
+								subscription: localId,
+							},
+						});
+					} catch (err) {
+						logger.warn("failed to send downstream for {localId}", {
+							localId,
+							err,
+						});
+					}
+				},
+			});
+
+			localSubs.set(localId, {
+				subscription,
+				transform,
+			});
+		},
+
+		unsubscribeLocal(localId: string) {
+			const sub = localSubs.get(localId);
+			if (sub) sub.subscription.unsubscribe();
+			localSubs.delete(localId);
+
+			if (localSubs.size === 0) {
+				const maybePromise = destroy();
+				if (maybePromise instanceof Promise) {
+					void maybePromise
+						.then(() => {
+							logger.info(
+								"destroyed shared subscription pool for {upstreamSubId}",
+								{
+									upstreamSubId,
+								},
+							);
+						})
+						.catch(() => {});
+				}
+			}
+		},
+
+		upstreamSubId,
+
+		subscribersCount() {
+			return localSubs.size;
+		},
+
+		hasSubscribers() {
+			return localSubs.size > 0;
 		},
 	};
 }
