@@ -92,9 +92,9 @@ export function createStateManager() {
 			),
 		);
 
-		live$.subscribe();
-
 		return new Observable<JSONRPCNotification>((subscriber) => {
+			const liveSub = live$.subscribe();
+
 			const waitInit = initialized$.pipe(
 				take(1),
 				timeout(10_000),
@@ -122,7 +122,12 @@ export function createStateManager() {
 			const combined$ = concat(replay$, live$);
 
 			const sub = combined$.subscribe(subscriber);
-			return () => sub.unsubscribe();
+			return () => {
+				logger.info`Unsubscribing from chain head state manager ${upstreamSubId}`;
+
+				sub.unsubscribe();
+				liveSub.unsubscribe();
+			};
 		});
 	}
 
