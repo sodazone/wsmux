@@ -18,6 +18,7 @@ const MAX_FOLLOWS_PER_UPSTREAM = 2;
 
 export const chainHead_v1_follow = ({
 	managers,
+	pinnedBlocks,
 }: ChainHeadState): JSONRPCMethodHandler => {
 	const methodKey = "chainHead_v1_follow";
 
@@ -59,8 +60,7 @@ export const chainHead_v1_follow = ({
 					followNotifyTransform(request),
 				);
 				upstream.unsubscribers.set(localId, () => {
-					// TODO: unpin cleanup
-					// unpinCleanup(localId, shared, upstream); <- impl in unpin
+					pinnedBlocks.unsubscribeLocal(upstream, localId);
 					shared.unsubscribeLocal(localId);
 				});
 			}

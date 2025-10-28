@@ -3,7 +3,7 @@ import { chainHead_v1_follow } from "./chain-head/follow";
 import { forwardChainHeadHandler } from "./chain-head/forward";
 import { createChainHeadState } from "./chain-head/state";
 import { chainHead_v1_unfollow } from "./chain-head/unfollow";
-//import { chainHead_v1_unpin } from "./chain-head/unpin";
+import { chainHead_v1_unpin } from "./chain-head/unpin";
 
 export function polkadotMethods() {
 	const state = createChainHeadState();
@@ -16,7 +16,7 @@ export function polkadotMethods() {
 		},
 		chainHead_v1_follow: chainHead_v1_follow(state),
 		chainHead_v1_unfollow: chainHead_v1_unfollow,
-		//chainHead_v1_unpin: chainHead_v1_unpin,
+		chainHead_v1_unpin: chainHead_v1_unpin(state),
 		chainHead_v1_header: forwardChainHeadHandler,
 		chainHead_v1_storage: forwardChainHeadHandler,
 		chainHead_v1_body: forwardChainHeadHandler,

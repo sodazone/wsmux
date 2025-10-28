@@ -6,6 +6,7 @@ import type {
 	UpstreamServer,
 } from "../../../upstream";
 import { createStateManager, type StateManager } from "./manager";
+import { createPinnedBlocks } from "./pinned";
 
 const logger = getLogger(["wsmux", "chainhead", "state"]);
 
@@ -50,5 +51,6 @@ export function createChainHeadState() {
 	const managers = createStateManagersMap();
 	return {
 		managers,
+		pinnedBlocks: createPinnedBlocks(),
 	};
 }
