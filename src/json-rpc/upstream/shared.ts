@@ -191,7 +191,7 @@ function createSharedSubscriptionPool(
 		shouldCreateMore(selected?: [string, SharedSubscription]) {
 			return (
 				(!selected || selected[1].subscribersCount() > 0) &&
-				this.size() < maxSubscriptions
+				subscriptions.size < maxSubscriptions
 			);
 		},
 

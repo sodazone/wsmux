@@ -28,7 +28,7 @@ function createStateManagersMap() {
 			}
 			const stateManager = stateManagers.get(followKey)!;
 			return pool.createShared(
-				pool.id,
+				followKey,
 				upstreamSubId,
 				stateManager.withUpdater(upstreamSubId, upstream),
 				async () => {
