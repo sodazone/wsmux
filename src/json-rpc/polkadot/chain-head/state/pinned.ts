@@ -21,7 +21,7 @@ export function createPinnedBlocks() {
 					set.delete(localId);
 
 					if (set.size === 0) {
-						logger.info`[Unsubscribe] unpinned block ${hash} from upstream ${upstreamId}`;
+						logger.info`[${upstreamId}] unpinned block ${hash} (unsubscribe)`;
 
 						stillPinned.delete(hash);
 
@@ -58,9 +58,7 @@ export function createPinnedBlocks() {
 
 					// If no one left pinned then real upstream unpin
 					if (set.size === 0) {
-						logger.debug(
-							(l) => l`Unpinned block ${hash} from upstream ${upstreamId}`,
-						);
+						logger.debug((l) => l`[${upstreamId}] unpinned block ${hash}`);
 
 						stillPinned.delete(hash);
 						upstream.send({

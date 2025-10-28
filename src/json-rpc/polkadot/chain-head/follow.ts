@@ -31,7 +31,7 @@ export const chainHead_v1_follow = ({
 		async handleRequest(upstream, downstream, request) {
 			const clientId = downstream.clientId;
 
-			logger.info((l) => l`Follow request from ${clientId}`);
+			logger.debug((l) => l`Follow request from ${clientId}`);
 
 			const chainHeadSubs: SharedSubscriptionPool =
 				upstream.subscriptions.getOrCreate(methodKey, {
@@ -45,7 +45,7 @@ export const chainHead_v1_follow = ({
 			) {
 				logger.info(
 					(l) =>
-						l`Assigning ${clientId} to ${followKey} (${shared.subscribersCount()} subs)`,
+						l`[${followKey}] assigning ${clientId} (${shared.subscribersCount()} subs)`,
 				);
 
 				const localId = downstream.getLocalId(shared.upstreamSubId);
@@ -73,7 +73,7 @@ export const chainHead_v1_follow = ({
 					const shared = await getOrCreateFollow(followKey, async () => {
 						logger.info(
 							(l) =>
-								l`Creating upstream follow ${followKey} (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
+								l`[${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
 						);
 						const { result: upstreamSubId } = (await upstream.request({
 							...request,

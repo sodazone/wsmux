@@ -123,7 +123,7 @@ export function createStateManager() {
 
 			const sub = combined$.subscribe(subscriber);
 			return () => {
-				logger.info`Unsubscribing from chain head state manager ${upstreamSubId}`;
+				logger.info`[${upstreamSubId}] unsubscribing from chain head state manager`;
 
 				sub.unsubscribe();
 				liveSub.unsubscribe();
