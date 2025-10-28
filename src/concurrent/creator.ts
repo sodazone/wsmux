@@ -43,10 +43,10 @@ export function createConcurrentCreator(
 			return result;
 		}
 
-		if (existing.waiting >= maxWaiting) {
+		if (existing.waiting + 1 >= maxWaiting) {
 			logger.warn(
 				(l) =>
-					l`[${label}] Too many concurrent waits (${existing.waiting}) for ${key}`,
+					l`[${label}] Too many concurrent waits (${existing.waiting + 1}) for ${key}`,
 			);
 			throw new TooManyWaitersError();
 		}
