@@ -4,7 +4,8 @@ import {
 	catchError,
 	filter,
 	map,
-	mergeMap,
+	share,
+	switchMap,
 	take,
 	timeout,
 } from "rxjs/operators";
@@ -29,6 +30,22 @@ export function createStateManager() {
 	const initialized$ = new ReplaySubject<JSONRPCNotification>(1);
 
 	const tracker = createBlockTracker(512, update);
+
+	function snapshotEvents(upstreamSubId: string) {
+		return [
+			{
+				...snapshot.initialized!,
+				params: {
+					...snapshot.initialized!.params,
+					subscription: upstreamSubId,
+				},
+			},
+			...snapshot.events.map((ev) => ({
+				...ev,
+				params: { ...ev.params, subscription: upstreamSubId },
+			})),
+		];
+	}
 
 	function update(msg: JSONRPCNotification) {
 		const event = msg.params?.result?.event;
@@ -90,43 +107,42 @@ export function createStateManager() {
 				),
 				map((msg) => msg as JSONRPCNotification),
 			),
+		).pipe(share());
+
+		// needed to keep up the initial snapshot
+		const liveSub = live$.subscribe();
+
+		const waitInit$ = initialized$.pipe(
+			take(1),
+			timeout(10_000),
+			catchError(() => of(null)),
 		);
 
+		let refCount = 0;
+
+		// Return a new observable that on each subscription:
+		// 1. waits for initialization
+		// 2. emits snapshot events
+		// 3. then continues with the shared live stream
 		return new Observable<JSONRPCNotification>((subscriber) => {
-			const liveSub = live$.subscribe();
+			refCount++;
+			const sub = waitInit$
+				.pipe(
+					switchMap(() => {
+						const replayEvents = snapshotEvents(upstreamSubId);
+						return concat(from(replayEvents), live$);
+					}),
+				)
+				.subscribe(subscriber);
 
-			const waitInit = initialized$.pipe(
-				take(1),
-				timeout(10_000),
-				catchError(() => of(null)),
-			);
-
-			// TODO: recover from error or timeout
-			const replay$ = waitInit.pipe(
-				map(() => [
-					{
-						...snapshot.initialized!,
-						params: {
-							...snapshot.initialized!.params,
-							subscription: upstreamSubId,
-						},
-					},
-					...snapshot.events.map((ev) => ({
-						...ev,
-						params: { ...ev.params, subscription: upstreamSubId },
-					})),
-				]),
-				mergeMap((arr) => from(arr)),
-			);
-
-			const combined$ = concat(replay$, live$);
-
-			const sub = combined$.subscribe(subscriber);
 			return () => {
-				logger.info`[${upstreamSubId}] unsubscribing from chain head state manager`;
-
 				sub.unsubscribe();
-				liveSub.unsubscribe();
+				refCount--;
+
+				if (refCount === 0) {
+					logger.info(`[${upstreamSubId}] no subscribers left, cleaning up`);
+					liveSub.unsubscribe();
+				}
 			};
 		});
 	}

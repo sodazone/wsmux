@@ -1,12 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-import {
-	finalize,
-	identity,
-	map,
-	type Observable,
-	type Subscription,
-	share,
-} from "rxjs";
+import { identity, map, type Observable, type Subscription } from "rxjs";
 
 import type { DownstreamClient } from "../downstream";
 import type { JSONRPCNotification } from "../types";
@@ -74,26 +67,6 @@ function createSharedSubscription(
 			transform?: (notif: JSONRPCNotification) => JSONRPCNotification;
 		}
 	>();
-	const shared$ = source$.pipe(
-		finalize(async () => {
-			if (localSubs.size === 0) {
-				return;
-			}
-
-			localSubs.forEach(({ subscription }) => {
-				subscription.unsubscribe();
-			});
-			localSubs.clear();
-			try {
-				await destroy();
-			} catch {
-				// TODO: all awaiting replies must be canceled upon closing.
-				// logger.error("upstream destroy failed", { error });
-			}
-		}),
-		share(),
-	);
-
 	return {
 		hasLocalSubscription(localId: string) {
 			return localSubs.has(localId);
@@ -116,7 +89,7 @@ function createSharedSubscription(
 				this.unsubscribeLocal(localId);
 			});
 
-			const subscription = shared$.pipe(map(transform ?? identity)).subscribe({
+			const subscription = source$.pipe(map(transform ?? identity)).subscribe({
 				next: (notif) => {
 					try {
 						downstream.send({
@@ -134,6 +107,7 @@ function createSharedSubscription(
 					}
 				},
 			});
+
 			localSubs.set(localId, {
 				subscription,
 				transform,
@@ -144,6 +118,27 @@ function createSharedSubscription(
 			const sub = localSubs.get(localId);
 			if (sub) sub.subscription.unsubscribe();
 			localSubs.delete(localId);
+
+			if (localSubs.size === 0) {
+				destroy()
+					.then(() => {
+						logger.info(
+							"destroyed shared subscription pool for {upstreamSubId}",
+							{
+								upstreamSubId,
+							},
+						);
+					})
+					.catch((err) => {
+						logger.error(
+							"failed to destroy shared subscription pool for {upstreamSubId} {err}",
+							{
+								upstreamSubId,
+								err,
+							},
+						);
+					});
+			}
 		},
 
 		upstreamSubId,

@@ -100,11 +100,14 @@ export const chainHead_v1_follow = ({
 							}),
 						);
 					} else {
-						logger.error("Error creating follow {clientId} {followKey}", {
-							error: err,
-							clientId,
-							followKey,
-						});
+						logger.error(
+							"Error creating follow {clientId} {followKey} {error}",
+							{
+								error: err,
+								clientId,
+								followKey,
+							},
+						);
 
 						downstream.send(
 							jsonRpcError({
