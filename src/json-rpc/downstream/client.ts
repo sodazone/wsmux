@@ -19,11 +19,29 @@ export function createDownstream(
 	ws: ServerWebSocket<JSONRPCContextData>,
 ): DownstreamClient {
 	const closeFns = new Set<() => void>();
+	let lastRequestTimes: number[] = [];
+	let _pendingRequests = 0;
 
 	return {
 		clientId: nextId(),
-		pendingRequests: 0,
-		lastRequestTimes: [],
+		get pendingRequests() {
+			return _pendingRequests;
+		},
+		startRequest() {
+			_pendingRequests++;
+			lastRequestTimes.push(Date.now());
+			if (lastRequestTimes.length > 10_000) {
+				lastRequestTimes.shift();
+			}
+		},
+		endRequest() {
+			_pendingRequests--;
+		},
+		requestsInPeriod(millis = 1_000) {
+			const now = Date.now();
+			lastRequestTimes = lastRequestTimes.filter((t) => now - t < millis);
+			return lastRequestTimes.length;
+		},
 		getLocalId(suffix: string): string {
 			return `${this.clientId}-${suffix}`;
 		},

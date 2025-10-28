@@ -45,12 +45,7 @@ export const jsonRpcMiddleware = (
 			return;
 		}
 
-		const now = Date.now();
-		client.lastRequestTimes = client.lastRequestTimes.filter(
-			(t) => now - t < 1000,
-		);
-
-		if (client.lastRequestTimes.length >= REQUESTS_PER_SECOND) {
+		if (client.requestsInPeriod(1_000) >= REQUESTS_PER_SECOND) {
 			client.send(
 				jsonRpcError({
 					kind: "RATE_LIMITED",
@@ -75,9 +70,8 @@ export const jsonRpcMiddleware = (
 			return;
 		}
 
-		client.pendingRequests++;
+		client.startRequest();
 		globalPending++;
-		client.lastRequestTimes.push(now);
 
 		try {
 			const upstream = registry.resolveUpstream(ctx.ws.data, req.method);
@@ -97,7 +91,7 @@ export const jsonRpcMiddleware = (
 				}),
 			);
 		} finally {
-			client.pendingRequests--;
+			client.endRequest();
 			globalPending--;
 		}
 

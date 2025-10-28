@@ -13,7 +13,9 @@ export type DownstreamMessage =
 export type DownstreamClient = {
 	clientId: number;
 	pendingRequests: number;
-	lastRequestTimes: number[];
+	startRequest(): void;
+	endRequest(): void;
+	requestsInPeriod(millis?: number): number;
 	getLocalId(suffix: string): string;
 	send(message: DownstreamMessage): number;
 	addCloseFn(closeFn: () => void): void;
