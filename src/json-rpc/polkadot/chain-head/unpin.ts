@@ -8,6 +8,6 @@ export const chainHead_v1_unpin: JSONRPCMethodHandler = {
 		const hashOrHashes = req.params[1];
 		const hashes = Array.isArray(hashOrHashes) ? hashOrHashes : [hashOrHashes];
 		const { pinnedBlocks } = chainHeadStateFrom(upstream);
-		pinnedBlocks.pinLocal(upstream, localId, hashes);
+		pinnedBlocks.unpinLocal(upstream, localId, hashes);
 	},
 };

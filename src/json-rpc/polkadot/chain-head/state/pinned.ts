@@ -34,7 +34,7 @@ export function createPinnedBlocks() {
 				}
 			}
 		},
-		pinLocal(upstream: UpstreamServer, localId: string, hashes: string[]) {
+		unpinLocal(upstream: UpstreamServer, localId: string, hashes: string[]) {
 			const follow = upstream.subscriptions
 				.get("chainHead_v1_follow")
 				?.getByLocalId(localId);
