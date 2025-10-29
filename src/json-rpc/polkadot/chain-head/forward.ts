@@ -3,7 +3,7 @@ import { jsonRpcError } from "../../errors";
 import type { JSONRPCMethodHandler } from "../../methods";
 import type { JSONRPCRequest, JSONRPCResponse } from "../../types";
 
-const baseForwardChainHeadHandler = ({
+const forwardChainHeadHandler = ({
 	beforeRequest,
 	afterResponse,
 }: {
@@ -37,14 +37,6 @@ const baseForwardChainHeadHandler = ({
 				return;
 			}
 
-			if (beforeRequest) {
-				const res = beforeRequest(req);
-				if (res) {
-					downstream.send(res);
-					return;
-				}
-			}
-
 			const upstreamReq = {
 				...req,
 				params: [
@@ -52,6 +44,14 @@ const baseForwardChainHeadHandler = ({
 					...(Array.isArray(req.params) ? req.params.slice(1) : []),
 				],
 			};
+
+			if (beforeRequest) {
+				const res = beforeRequest(upstreamReq);
+				if (res) {
+					downstream.send(res);
+					return;
+				}
+			}
 
 			try {
 				const response = await upstream.request(upstreamReq);
@@ -71,18 +71,22 @@ const baseForwardChainHeadHandler = ({
 	};
 };
 
-export const forwardChainHeadHandler: JSONRPCMethodHandler =
-	baseForwardChainHeadHandler({});
+export const chainHead_v1_forward: JSONRPCMethodHandler =
+	forwardChainHeadHandler({});
 
-export const cachingForwardChainHeadHandler = (
-	maxSize = 100,
-	keyOf: (req: JSONRPCRequest) => string = (req) => req.params[1],
-): JSONRPCMethodHandler => {
+export const chainHead_v1_header = (maxSize = 100): JSONRPCMethodHandler => {
 	const cache = createCache<JSONRPCResponse>(maxSize);
+	const keyOf: (req: JSONRPCRequest) => string = (req) => req.params[1];
 
-	return baseForwardChainHeadHandler({
+	return forwardChainHeadHandler({
 		beforeRequest: (req) => {
-			return cache.get(keyOf(req));
+			const res = cache.get(keyOf(req));
+			if (res) {
+				return {
+					...res,
+					id: req.id,
+				} as JSONRPCResponse;
+			}
 		},
 		afterResponse: (req, res) => {
 			cache.set(keyOf(req), res);
