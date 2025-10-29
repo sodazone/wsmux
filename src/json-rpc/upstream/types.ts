@@ -20,6 +20,7 @@ export type SharedSubscription = {
 	subscribersCount(): number;
 	getLocalIds(): string[];
 	upstreamSubId: string;
+	abort(): void;
 };
 
 export type SharedSubscriptionGroup = ReturnType<

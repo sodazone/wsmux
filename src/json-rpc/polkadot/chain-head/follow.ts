@@ -74,11 +74,16 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							(l) =>
 								l`[${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
 						);
-						const { result: upstreamSubId } = (await upstream.request({
+						const response = await upstream.request({
 							...request,
 							params: [true],
-						})) as { result: string };
-						if (!upstreamSubId) throw new Error("No upstreamSubId in response");
+						});
+
+						const upstreamSubId = response.result;
+						if (!upstreamSubId)
+							throw new Error(
+								`No upstreamSubId in response ${JSON.stringify(response)}`,
+							);
 
 						return managers.createSharedSubscription(
 							followKey,

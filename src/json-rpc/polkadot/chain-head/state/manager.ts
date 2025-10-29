@@ -97,6 +97,8 @@ export function createStateManager() {
 	}
 
 	function withUpdater(upstreamSubId: string, upstream: UpstreamServer) {
+		logger.info(`Subscribing to chainHead_v1_followEvent for ${upstreamSubId}`);
+
 		const live$ = handleUpdates(
 			upstream.message$.pipe(
 				filter(
@@ -107,7 +109,7 @@ export function createStateManager() {
 				),
 				map((msg) => msg as JSONRPCNotification),
 			),
-		).pipe(share());
+		).pipe(share({ resetOnRefCountZero: true }));
 
 		// needed to keep up the initial snapshot
 		const liveSub = live$.subscribe();
@@ -118,22 +120,21 @@ export function createStateManager() {
 			catchError(() => of(null)),
 		);
 
-		let refCount = 0;
-
 		// Return a new observable that on each subscription:
 		// 1. waits for initialization
 		// 2. emits snapshot events
 		// 3. then continues with the shared live stream
 		return new Observable<JSONRPCNotification>((subscriber) => {
-			refCount++;
 			const sub = waitInit$
 				.pipe(
 					switchMap((init) => {
+						if (!liveSub.closed) liveSub.unsubscribe();
 						if (!init) {
 							return EMPTY;
 						}
 
 						const replayEvents = snapshotEvents(upstreamSubId);
+						logger.info`Replaying ${replayEvents.length} events`;
 						return concat(from(replayEvents), live$);
 					}),
 				)
@@ -141,12 +142,6 @@ export function createStateManager() {
 
 			return () => {
 				sub.unsubscribe();
-				refCount--;
-
-				if (refCount === 0) {
-					logger.info(`[${upstreamSubId}] no subscribers left, cleaning up`);
-					liveSub.unsubscribe();
-				}
 			};
 		});
 	}

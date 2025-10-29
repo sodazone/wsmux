@@ -40,6 +40,12 @@ export function createSharedSubscriptionGroup() {
 		get(key: string) {
 			return groups.get(key);
 		},
+		abort() {
+			groups.forEach((pool) => {
+				pool.abort();
+			});
+			groups.clear();
+		},
 	};
 }
 
@@ -165,6 +171,13 @@ function createSharedSubscriptionPool(
 			this.set(key, shared);
 			return shared;
 		},
+
+		abort() {
+			subscriptions.values().forEach((sub) => {
+				sub.abort();
+			});
+			subscriptions.clear();
+		},
 	};
 }
 
@@ -185,6 +198,8 @@ function _createSharedSubscription(
 	source$: Observable<JSONRPCNotification>,
 	destroy: () => Promise<void> | void,
 ): SharedSubscription {
+	let aborted = false;
+
 	const localSubs = new Map<
 		string,
 		{
@@ -192,6 +207,12 @@ function _createSharedSubscription(
 			transform?: (notif: JSONRPCNotification) => JSONRPCNotification;
 		}
 	>();
+
+	const abort = () => {
+		aborted = true;
+		logger.warn`[${upstreamSubId}] Shared subscription aborted (upstream disconnect)`;
+	};
+
 	return {
 		hasLocalSubscription(localId: string) {
 			return localSubs.has(localId);
@@ -216,6 +237,7 @@ function _createSharedSubscription(
 
 			const subscription = source$.pipe(map(transform ?? identity)).subscribe({
 				next: (notif) => {
+					if (aborted) return;
 					try {
 						downstream.send({
 							...notif,
@@ -244,7 +266,7 @@ function _createSharedSubscription(
 			if (sub) sub.subscription.unsubscribe();
 			localSubs.delete(localId);
 
-			if (localSubs.size === 0) {
+			if (!aborted && localSubs.size === 0) {
 				const maybePromise = destroy();
 				if (maybePromise instanceof Promise) {
 					void maybePromise
@@ -270,5 +292,7 @@ function _createSharedSubscription(
 		hasSubscribers() {
 			return localSubs.size > 0;
 		},
+
+		abort,
 	};
 }

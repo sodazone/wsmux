@@ -24,17 +24,17 @@ export function createUpstreamServer({
 	const connection$ = new BehaviorSubject<WebSocket | null>(null);
 	const unsubscribers = new Map<string, () => void>();
 	const states = new Map<string, unknown>();
-
-	let message$ = createMessageSubject();
+	const subscriptions = createSharedSubscriptionGroup();
+	const message$ = createMessageSubject();
 
 	let stopped = false;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function cleanup() {
 		if (reconnectTimer) clearTimeout(reconnectTimer);
-
-		message$.complete();
-		message$ = createMessageSubject();
+		unsubscribers.clear();
+		states.clear();
+		subscriptions.abort();
 	}
 
 	async function connect() {
@@ -46,9 +46,6 @@ export function createUpstreamServer({
 		ws.onopen = () => {
 			logger.info`[${url}] connected ok`;
 			connection$.next(ws);
-			message$.subscribe({
-				complete: () => logger.info(`[${url}] message$ completed`),
-			});
 		};
 
 		ws.onmessage = ({ data }) => handleMessage(data.toString());
@@ -57,7 +54,9 @@ export function createUpstreamServer({
 			connection$.next(null);
 			logger.info`[${url}] disconnected (${event.code})`;
 
-			if (!stopped) {
+			if (stopped) {
+				message$.complete();
+			} else {
 				cleanup();
 
 				logger.debug`[${url}] scheduling reconnect in ${retryDelay}ms`;
@@ -74,7 +73,7 @@ export function createUpstreamServer({
 		url,
 		nextId: 0,
 		supportedMethods,
-		subscriptions: createSharedSubscriptionGroup(),
+		subscriptions,
 		unsubscribers,
 		message$,
 
