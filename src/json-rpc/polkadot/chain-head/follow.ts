@@ -3,7 +3,7 @@ import { getLogger } from "@logtape/logtape";
 import {
 	createConcurrentCreator,
 	TooManyWaitersError,
-} from "../../../concurrent/creator";
+} from "../../../util/concurrent-creator";
 import { jsonRpcError } from "../../errors";
 import type { JSONRPCMethodHandler } from "../../methods";
 import type {

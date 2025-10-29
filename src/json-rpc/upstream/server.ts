@@ -104,7 +104,10 @@ export function createUpstreamServer({
 				map((response) => ({ ...response, id: req.id }) as JSONRPCResponse),
 				timeout(10_000),
 				catchError((err) => {
-					logger.warn("Request stream aborted or timed out", { url, err });
+					logger.warn(
+						"[{url}] Request {req.method} stream aborted or timed out {err}",
+						{ url, err, req },
+					);
 					return of(null);
 				}),
 			);
