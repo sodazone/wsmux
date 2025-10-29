@@ -80,6 +80,8 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 						});
 
 						const upstreamSubId = response.result;
+						// TODO: handle error
+						// {"jsonrpc":"2.0","id":1,"error":{"code":-32800,"message":"Maximum number of chainHead_follow has been reached"}}
 						if (!upstreamSubId)
 							throw new Error(
 								`No upstreamSubId in response ${JSON.stringify(response)}`,
