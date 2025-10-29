@@ -1,6 +1,6 @@
 import type { JSONRPCContextData } from "../types";
 import { createUpstreamServer } from "./server";
-import type { UpstreamRegistry } from "./types";
+import type { UpstreamRegistry, UpstreamServer } from "./types";
 
 export function createUpstreamRegistry(
 	configs: {
@@ -9,23 +9,42 @@ export function createUpstreamRegistry(
 	}[],
 ): UpstreamRegistry {
 	const servers = configs.map(createUpstreamServer);
+	const clientUpstream = new Map<number, UpstreamServer>();
+	let lastIndex = -1;
 
-	const resolveUpstream = (_ctx: JSONRPCContextData, method: string) => {
-		const server = servers.find(
+	const resolveUpstream = (ctx: JSONRPCContextData, method: string) => {
+		const clientId = ctx.client?.clientId;
+		if (clientId === undefined) {
+			return undefined;
+		}
+
+		if (clientUpstream.has(clientId)) {
+			const server = clientUpstream.get(clientId)!;
+			if (server.isReady()) return server;
+			clientUpstream.delete(clientId);
+		}
+
+		const candidates = servers.filter(
 			(s) =>
 				s.isReady() &&
 				(s.supportedMethods === undefined ||
 					s.supportedMethods.includes(method)),
 		);
+		if (candidates.length === 0) return undefined;
 
-		if (!server) return undefined;
+		lastIndex = (lastIndex + 1) % candidates.length;
+		const server = candidates[lastIndex]!;
 
+		clientUpstream.set(clientId, server);
 		return server;
 	};
 
 	return {
 		servers,
 		resolveUpstream,
+		disconnect: (clientId: number) => {
+			clientUpstream.delete(clientId);
+		},
 		connectAll: async () => {
 			await Promise.all(servers.map((server) => server.connect()));
 		},

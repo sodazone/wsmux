@@ -21,7 +21,13 @@ export const jsonRpcMiddleware = (
 	},
 
 	close: async (ctx, next) => {
-		ctx.ws.data.client?.close?.();
+		const client = ctx.ws.data.client;
+		if (client) {
+			if (client.clientId !== undefined) {
+				registry.disconnect(client.clientId);
+			}
+			client.close?.();
+		}
 		await next();
 	},
 

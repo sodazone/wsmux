@@ -55,6 +55,7 @@ export type UpstreamRegistry = {
 		ctx: JSONRPCContextData,
 		method: string,
 	) => UpstreamServer | undefined;
+	disconnect: (clientId: number) => void;
 	destroy: () => void;
 	connectAll: () => Promise<void>;
 };
