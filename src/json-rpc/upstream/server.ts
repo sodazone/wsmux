@@ -105,8 +105,8 @@ export function createUpstreamServer({
 				timeout(10_000),
 				catchError((err) => {
 					logger.warn(
-						"[{url}] Request {req.method} stream aborted or timed out {err}",
-						{ url, err, req },
+						"[{url}] Request {method} stream aborted or timed out {err}",
+						{ url, err, method: req.method },
 					);
 					return of(null);
 				}),
