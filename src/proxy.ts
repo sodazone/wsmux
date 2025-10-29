@@ -16,6 +16,7 @@ async function run(
 
 	const registry = createUpstreamRegistry([
 		{ url: "wss://dot-rpc.stakeworld.io" },
+		{ url: "wss://rpc-polkadot.helixstreet.io" },
 	]);
 	await registry.connectAll();
 
