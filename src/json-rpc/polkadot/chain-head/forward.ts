@@ -74,15 +74,18 @@ const baseForwardChainHeadHandler = ({
 export const forwardChainHeadHandler: JSONRPCMethodHandler =
 	baseForwardChainHeadHandler({});
 
-export const cachingForwardChainHeadHandler = (): JSONRPCMethodHandler => {
-	const cache = createCache<JSONRPCResponse>(100);
+export const cachingForwardChainHeadHandler = (
+	maxSize = 100,
+	keyOf: (req: JSONRPCRequest) => string = (req) => req.params[1],
+): JSONRPCMethodHandler => {
+	const cache = createCache<JSONRPCResponse>(maxSize);
 
 	return baseForwardChainHeadHandler({
 		beforeRequest: (req) => {
-			return cache.get(req.params[1]);
+			return cache.get(keyOf(req));
 		},
 		afterResponse: (req, res) => {
-			cache.set(req.params[1], res);
+			cache.set(keyOf(req), res);
 		},
 	});
 };
