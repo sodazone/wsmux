@@ -47,10 +47,14 @@ function createStateManagersMap() {
 
 export type ChainHeadState = ReturnType<typeof createChainHeadState>;
 
-export function createChainHeadState() {
+function createChainHeadState() {
 	const managers = createStateManagersMap();
 	return {
 		managers,
 		pinnedBlocks: createPinnedBlocks(),
 	};
+}
+
+export function chainHeadStateFrom(upstream: UpstreamServer) {
+	return upstream.getOrCreateState("chainHead", createChainHeadState);
 }

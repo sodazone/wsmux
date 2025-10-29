@@ -39,6 +39,7 @@ export type UpstreamServer = {
 	isReady(): boolean;
 	connect(): Promise<void>;
 	stop(): void;
+	getOrCreateState<T>(id: string, factory: () => T): T;
 };
 
 export type UpstreamServerConfig = {

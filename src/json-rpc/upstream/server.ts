@@ -23,6 +23,8 @@ export function createUpstreamServer({
 }: UpstreamServerConfig): UpstreamServer {
 	const connection$ = new BehaviorSubject<WebSocket | null>(null);
 	const unsubscribers = new Map<string, () => void>();
+	const states = new Map<string, unknown>();
+
 	let message$ = createMessageSubject();
 
 	let stopped = false;
@@ -134,6 +136,13 @@ export function createUpstreamServer({
 		},
 
 		connect,
+
+		getOrCreateState<T>(id: string, factory: () => T) {
+			if (!states.has(id)) {
+				states.set(id, factory());
+			}
+			return states.get(id)! as T;
+		},
 	};
 
 	function handleMessage(data: string) {

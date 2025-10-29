@@ -10,16 +10,13 @@ import type {
 	SharedSubscription,
 	SharedSubscriptionPool,
 } from "../../upstream";
-import type { ChainHeadState } from "./state";
+import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
 const logger = getLogger("wsmux.chainhead.follow");
 const MAX_FOLLOWS_PER_UPSTREAM = 4;
 
-export const chainHead_v1_follow = ({
-	managers,
-	pinnedBlocks,
-}: ChainHeadState): JSONRPCMethodHandler => {
+export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 	const methodKey = "chainHead_v1_follow";
 
 	const getOrCreateFollow = createConcurrentCreator({
@@ -29,6 +26,8 @@ export const chainHead_v1_follow = ({
 
 	return {
 		async handleRequest(upstream, downstream, request) {
+			const { managers, pinnedBlocks } = chainHeadStateFrom(upstream);
+
 			const clientId = downstream.clientId;
 
 			logger.debug((l) => l`Follow request from ${clientId}`);
@@ -45,7 +44,7 @@ export const chainHead_v1_follow = ({
 			) {
 				logger.info(
 					(l) =>
-						l`[${followKey}] assigning ${clientId} (${shared.subscribersCount()} subs)`,
+						l`[${shared.upstreamSubId}] ${followKey} assigning ${clientId} (${shared.subscribersCount()} subs)`,
 				);
 
 				const localId = downstream.getLocalId(shared.upstreamSubId);
