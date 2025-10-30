@@ -7,12 +7,7 @@ const JSONRPCErrorCodes = {
 	INVALID_PARAMS: { code: -32602, message: "Invalid params" },
 	INTERNAL_ERROR: { code: -32603, message: "Internal error" },
 	SERVER_ERROR: { code: -32000, message: "Server error" },
-	RESOURCE_NOT_FOUND: { code: -32001, message: "Resource not found" },
-	RESOURCE_UNAVAILABLE: { code: -32002, message: "Resource unavailable" },
-	TRANSACTION_REJECTED: { code: -32003, message: "Transaction rejected" },
 	RATE_LIMITED: { code: -32004, message: "Rate limited" },
-	TIMEOUT: { code: -32005, message: "Timeout" },
-	UPSTREAM_ERROR: { code: -32006, message: "Upstream error" },
 } as const;
 
 export type JSONRPCErrorCode = keyof typeof JSONRPCErrorCodes;
