@@ -57,8 +57,11 @@ export function jsonRpcError(
 }
 
 export class RateLimitedError extends Error {
-	constructor(message = "Rate limit reached") {
+	code: number;
+
+	constructor(message = "Rate limit reached", code = -32004) {
 		super(message);
 		this.name = "RateLimited";
+		this.code = code;
 	}
 }

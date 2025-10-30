@@ -93,6 +93,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 								);
 								throw new RateLimitedError(
 									message ?? "Upstream follow limit reached",
+									code,
 								);
 							}
 
@@ -125,8 +126,8 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					} else if (err instanceof RateLimitedError) {
 						downstream.send(
 							jsonRpcError({
-								kind: "RATE_LIMITED",
 								message: err.message,
+								code: err.code,
 								req: request,
 							}),
 						);
