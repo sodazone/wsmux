@@ -4,6 +4,8 @@ import type { UpstreamServer } from "../../../upstream";
 
 const logger = getLogger(["wsmux", "chainhead", "unpin"]);
 
+const MAX_HASHES_PER_UPSTREAM = 512;
+
 export function createPinnedBlocks() {
 	const pinned = new Map();
 
@@ -17,8 +19,8 @@ export function createPinnedBlocks() {
 				?.getByLocalId(localId);
 
 			if (follow) {
-				const upstreamId = follow.upstreamSubId;
-				const stillPinned = pinned.get(upstreamId);
+				const upstreamSubId = follow.upstreamSubId;
+				const stillPinned = pinned.get(upstreamSubId);
 
 				if (!stillPinned) {
 					return;
@@ -28,19 +30,19 @@ export function createPinnedBlocks() {
 					set.delete(localId);
 
 					if (set.size === 0) {
-						logger.info`[${upstreamId}] unpinned block ${hash} (unsubscribe)`;
+						logger.info`[${upstreamSubId}] unpinned block ${hash} (unsubscribe)`;
 
 						stillPinned.delete(hash);
 
 						upstream.send({
 							jsonrpc: "2.0",
 							method: "chainHead_v1_unpin",
-							params: [upstreamId, hash],
+							params: [upstreamSubId, hash],
 						});
 					}
 				}
 				if (stillPinned.size === 0) {
-					pinned.delete(upstreamId);
+					pinned.delete(upstreamSubId);
 				}
 			}
 		},
@@ -50,11 +52,11 @@ export function createPinnedBlocks() {
 				?.getByLocalId(localId);
 
 			if (follow) {
-				const upstreamId = follow.upstreamSubId;
-				if (!pinned.has(upstreamId)) {
-					pinned.set(upstreamId, new Map());
+				const upstreamSubId = follow.upstreamSubId;
+				if (!pinned.has(upstreamSubId)) {
+					pinned.set(upstreamSubId, new Map());
 				}
-				const stillPinned = pinned.get(upstreamId)!;
+				const stillPinned = pinned.get(upstreamSubId)!;
 				hashes.forEach((hash) => {
 					let set = stillPinned.get(hash);
 
@@ -68,24 +70,29 @@ export function createPinnedBlocks() {
 						// First unpin means all locals were still pinned
 						set = new Set(follow.getLocalIds());
 						stillPinned.set(hash, set);
+
+						if (stillPinned.size >= MAX_HASHES_PER_UPSTREAM) {
+							const oldestHash = stillPinned.keys().next().value;
+							stillPinned.delete(oldestHash);
+						}
 					}
 
 					set.delete(localId);
 
 					// If no one left pinned then real upstream unpin
 					if (set.size === 0) {
-						logger.debug((l) => l`[${upstreamId}] unpinned block ${hash}`);
+						logger.debug((l) => l`[${upstreamSubId}] unpinned block ${hash}`);
 
 						stillPinned.delete(hash);
 						upstream.send({
 							jsonrpc: "2.0",
 							method: "chainHead_v1_unpin",
-							params: [upstreamId, hash],
+							params: [upstreamSubId, hash],
 						});
 					}
 				});
 				if (stillPinned.size === 0) {
-					pinned.delete(upstreamId);
+					pinned.delete(upstreamSubId);
 				}
 			}
 		},
