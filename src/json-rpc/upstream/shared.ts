@@ -150,9 +150,17 @@ function createSharedSubscriptionPool(
 		},
 
 		/**
-		 * Factory: create a shared subscription for this pool
-		 * - source$ is upstream observable
-		 * - destroy is cleanup callback
+		 * Creates a shared subscription that fans out an upstream observable
+		 * to multiple downstream clients, maintaining independent local subscriptions.
+		 *
+		 * - `key` is the identifier of the shared subscription.
+		 * - `upstreamSubId` is the identifier of the upstream subscription.
+		 * - `source$` is the shared upstream observable stream.
+		 * - `destroy` is a cleanup callback invoked once the upstream is no longer needed.
+		 *
+		 * Local vs. upstream subscriptions:
+		 * - **Upstream subscription**: Only one exists per `upstreamSubId`, shared among all downstreams.
+		 * - **Local subscription**: Each downstream client gets its own subscription to the shared upstream.
 		 */
 		createSharedSubscription(
 			key: string,
@@ -181,18 +189,6 @@ function createSharedSubscriptionPool(
 	};
 }
 
-/**
- * Creates a shared subscription that fans out an upstream observable
- * to multiple downstream clients, maintaining independent local subscriptions.
- *
- * - `upstreamSubId` is the identifier of the upstream subscription.
- * - `source$` is the shared upstream observable stream.
- * - `destroy` is a cleanup callback invoked once the upstream is no longer needed.
- *
- * Local vs. upstream subscriptions:
- * - **Upstream subscription**: Only one exists per `upstreamSubId`, shared among all downstreams.
- * - **Local subscription**: Each downstream client gets its own subscription to the shared upstream.
- */
 function _createSharedSubscription(
 	upstreamSubId: string,
 	source$: Observable<JSONRPCNotification>,

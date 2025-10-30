@@ -27,10 +27,10 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 	return {
 		async handleRequest(upstream, downstream, request) {
 			const { managers, pinnedBlocks } = chainHeadStateFrom(upstream);
-
 			const clientId = downstream.clientId;
+			const upstreamId = upstream.url;
 
-			logger.debug((l) => l`Follow request from ${clientId}`);
+			logger.debug((l) => l`[${upstreamId}] Follow request from ${clientId}`);
 
 			const chainHeadSubs: SharedSubscriptionPool =
 				upstream.subscriptions.getOrCreate(methodKey, {
@@ -44,7 +44,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 			) {
 				logger.info(
 					(l) =>
-						l`[${shared.upstreamSubId}] ${followKey} assigning ${clientId} (${shared.subscribersCount()} subs)`,
+						l`[${upstreamId}:${shared.upstreamSubId}] ${followKey} assigning ${clientId} (${shared.subscribersCount()} subs)`,
 				);
 
 				const localId = downstream.getLocalId(shared.upstreamSubId);
@@ -72,7 +72,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					const shared = await getOrCreateFollow(followKey, async () => {
 						logger.info(
 							(l) =>
-								l`[${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
+								l`[${upstreamId}:${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
 						);
 
 						const response = await upstream.request({
@@ -89,7 +89,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							if (code === -32800) {
 								logger.warn(
 									(l) =>
-										l`[${followKey}] upstream follow limit reached (${code}: ${message})`,
+										l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message})`,
 								);
 								throw new RateLimitedError(
 									message ?? "Upstream follow limit reached",
@@ -102,7 +102,9 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 
 						const upstreamSubId = response.result;
 						if (!upstreamSubId) {
-							throw new Error(`[${followKey}] No upstreamSubId in response`);
+							throw new Error(
+								`[${upstreamId}:${followKey}] No upstreamSubId in response`,
+							);
 						}
 
 						return managers.createSharedSubscription(
