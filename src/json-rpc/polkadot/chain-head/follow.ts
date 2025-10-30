@@ -4,7 +4,7 @@ import {
 	createConcurrentCreator,
 	TooManyWaitersError,
 } from "../../../util/concurrent-creator";
-import { jsonRpcError } from "../../errors";
+import { jsonRpcError, RateLimitedError } from "../../errors";
 import type { JSONRPCMethodHandler } from "../../methods";
 import type {
 	SharedSubscription,
@@ -74,18 +74,35 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							(l) =>
 								l`[${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
 						);
+
 						const response = await upstream.request({
 							...request,
 							params: [true],
 						});
 
+						if ("error" in response) {
+							const { code, message } = response.error as {
+								code: number;
+								message: string;
+							};
+
+							if (code === -32800) {
+								logger.warn(
+									(l) =>
+										l`[${followKey}] upstream follow limit reached (${code}: ${message})`,
+								);
+								throw new RateLimitedError(
+									message ?? "Upstream follow limit reached",
+								);
+							}
+
+							throw new Error(`Upstream RPC error ${code}: ${message}`);
+						}
+
 						const upstreamSubId = response.result;
-						// TODO: handle error
-						// {"jsonrpc":"2.0","id":1,"error":{"code":-32800,"message":"Maximum number of chainHead_follow has been reached"}}
-						if (!upstreamSubId)
-							throw new Error(
-								`No upstreamSubId in response ${JSON.stringify(response)}`,
-							);
+						if (!upstreamSubId) {
+							throw new Error(`[${followKey}] No upstreamSubId in response`);
+						}
 
 						return managers.createSharedSubscription(
 							followKey,
@@ -102,6 +119,14 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							jsonRpcError({
 								kind: "RATE_LIMITED",
 								message: "Backpressure: too many concurrent requests",
+								req: request,
+							}),
+						);
+					} else if (err instanceof RateLimitedError) {
+						downstream.send(
+							jsonRpcError({
+								kind: "RATE_LIMITED",
+								message: err.message,
 								req: request,
 							}),
 						);

@@ -55,3 +55,10 @@ export function jsonRpcError(
 		},
 	};
 }
+
+export class RateLimitedError extends Error {
+	constructor(message = "Rate limit reached") {
+		super(message);
+		this.name = "RateLimited";
+	}
+}
