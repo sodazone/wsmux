@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import client from "prom-client";
 
 import type { JSONRPCContextData } from "./json-rpc";
 import { createUpstreamRegistry, jsonRpcMiddleware } from "./json-rpc";
@@ -29,7 +30,14 @@ async function run(
 
 	const server = Bun.serve({
 		...options,
-		fetch(req, server) {
+		async fetch(req, server) {
+			if (new URL(req.url).pathname === "/metrics") {
+				const metrics = await client.register.metrics();
+				return new Response(metrics, {
+					headers: { "Content-Type": client.register.contentType },
+				});
+			}
+
 			if (server.upgrade(req, { data: {} })) return;
 			return new Response("Upgrade required", { status: 426 });
 		},

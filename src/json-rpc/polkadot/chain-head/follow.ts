@@ -10,6 +10,7 @@ import type {
 	SharedSubscription,
 	SharedSubscriptionPool,
 } from "../../upstream";
+import { observeFollow } from "./metrics/follow.metrics";
 import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
@@ -69,51 +70,53 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 				const followKey = `${methodKey}:${followIndex}`;
 
 				try {
-					const shared = await getOrCreateFollow(followKey, async () => {
-						logger.info(
-							(l) =>
-								l`[${upstreamId}:${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
-						);
+					const shared = await observeFollow(upstreamId, () =>
+						getOrCreateFollow(followKey, async () => {
+							logger.info(
+								(l) =>
+									l`[${upstreamId}:${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
+							);
 
-						const response = await upstream.request({
-							...request,
-							params: [true],
-						});
+							const response = await upstream.request({
+								...request,
+								params: [true],
+							});
 
-						if ("error" in response) {
-							const { code, message } = response.error as {
-								code: number;
-								message: string;
-							};
+							if ("error" in response) {
+								const { code, message } = response.error as {
+									code: number;
+									message: string;
+								};
 
-							if (code === -32800) {
-								logger.warn(
-									(l) =>
-										l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message})`,
-								);
-								throw new RateLimitedError(
-									message ?? "Upstream follow limit reached",
-									code,
+								if (code === -32800) {
+									logger.warn(
+										(l) =>
+											l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message})`,
+									);
+									throw new RateLimitedError(
+										message ?? "Upstream follow limit reached",
+										code,
+									);
+								}
+
+								throw new Error(`Upstream RPC error ${code}: ${message}`);
+							}
+
+							const upstreamSubId = response.result;
+							if (!upstreamSubId) {
+								throw new Error(
+									`[${upstreamId}:${followKey}] No upstreamSubId in response`,
 								);
 							}
 
-							throw new Error(`Upstream RPC error ${code}: ${message}`);
-						}
-
-						const upstreamSubId = response.result;
-						if (!upstreamSubId) {
-							throw new Error(
-								`[${upstreamId}:${followKey}] No upstreamSubId in response`,
+							return managers.createSharedSubscription(
+								followKey,
+								upstream,
+								upstreamSubId,
+								chainHeadSubs,
 							);
-						}
-
-						return managers.createSharedSubscription(
-							followKey,
-							upstream,
-							upstreamSubId,
-							chainHeadSubs,
-						);
-					});
+						}),
+					);
 					await assignToDownstream(followKey, shared);
 					return;
 				} catch (err) {

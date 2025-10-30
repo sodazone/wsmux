@@ -1,69 +1,59 @@
-import { getLogger } from "@logtape/logtape";
+import { Counter, Gauge, Histogram } from "prom-client";
+
 import type { WebSocketMiddleware } from "./ws";
 
-const logger = getLogger(["wsmux", "metrics"]);
+export const wsMetrics = {
+	activeConnections: new Gauge({
+		name: "wsmux_ws_active_connections",
+		help: "Current number of active WebSocket connections",
+	}),
+	totalConnections: new Counter({
+		name: "wsmux_ws_total_connections",
+		help: "Total WebSocket connections",
+	}),
+	totalMessages: new Counter({
+		name: "wsmux_ws_total_messages",
+		help: "Total messages received",
+	}),
+	totalErrors: new Counter({
+		name: "wsmux_ws_total_errors",
+		help: "Total errors encountered",
+	}),
+	messageDuration: new Histogram({
+		name: "wsmux_ws_message_duration_seconds",
+		help: "Message processing duration",
+		buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5], // seconds
+	}),
+};
 
 export const metricsMiddleware = (): WebSocketMiddleware => {
-	let activeConnections = 0;
-	let totalConnections = 0;
-	let totalMessages = 0;
-	let totalErrors = 0;
-	let totalMessageTime = 0;
-
-	setInterval(() => {
-		const avgResponseTimeMs =
-			totalMessages > 0 ? totalMessageTime / totalMessages : 0;
-		const errorRate = totalMessages > 0 ? totalErrors / totalMessages : 0;
-
-		logger.info(
-			(l) =>
-				l`Metrics:
-  active=${activeConnections},
-  total=${totalConnections},
-  messages=${totalMessages},
-  errors=${totalErrors},
-  avgResponseTimeMs=${avgResponseTimeMs},
-  errorRate=${errorRate}`,
-		);
-	}, 20_000).unref();
-
 	return {
-		open: async (ctx, next) => {
-			activeConnections++;
-			totalConnections++;
+		open: async (_ctx, next) => {
+			wsMetrics.activeConnections.inc();
+			wsMetrics.totalConnections.inc();
 			await next();
-			logger.debug(
-				(l) =>
-					l`Client connected: ${ctx.ws.remoteAddress}, active=${activeConnections}, total=${totalConnections}`,
-			);
 		},
 
 		message: async (_ctx, next) => {
-			const start = performance.now();
+			const endTimer = wsMetrics.messageDuration.startTimer();
 			try {
 				await next();
 			} catch (err) {
-				totalErrors++;
+				wsMetrics.totalErrors.inc();
 				throw err;
 			} finally {
-				const duration = performance.now() - start;
-				totalMessages++;
-				totalMessageTime += duration;
+				wsMetrics.totalMessages.inc();
+				endTimer();
 			}
 		},
 
-		close: async (ctx, next) => {
-			activeConnections--;
+		close: async (_ctx, next) => {
+			wsMetrics.activeConnections.dec();
 			await next();
-			logger.debug(
-				(l) =>
-					l`Client disconnected: ${ctx.ws.remoteAddress}, active=${activeConnections}, total=${totalConnections}`,
-			);
 		},
 
-		error: async (err, next) => {
-			totalErrors++;
-			logger.warn`Error for client: ${err}`;
+		error: async (_err, next) => {
+			wsMetrics.totalErrors.inc();
 			await next();
 		},
 	};
