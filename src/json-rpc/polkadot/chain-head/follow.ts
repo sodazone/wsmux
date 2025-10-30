@@ -134,7 +134,6 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					}),
 				);
 				await assignToDownstream(followKey, shared);
-				return;
 			} catch (err) {
 				if (err instanceof TooManyWaitersError) {
 					downstream.send(
@@ -167,14 +166,6 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					);
 				}
 			}
-
-			downstream.send(
-				jsonRpcError({
-					kind: "RATE_LIMITED",
-					message: "No available follows",
-					req: request,
-				}),
-			);
 		},
 	};
 };
