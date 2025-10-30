@@ -67,7 +67,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 			try {
 				const [followKey, shared] = await observeFollow(upstreamId, () =>
 					getOrCreateFollow(`${upstreamId}:${methodKey}`, async () => {
-						let selected = chainHeadSubs.getLeastLoaded();
+						const selected = chainHeadSubs.getLeastLoaded();
 
 						if (selected && !chainHeadSubs.shouldCreateMore(selected)) {
 							return selected;
@@ -118,12 +118,6 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							upstreamSubId,
 							chainHeadSubs,
 						);
-
-						selected = chainHeadSubs.getLeastLoaded();
-
-						if (selected && selected[1] !== shared) {
-							return selected;
-						}
 
 						return [followKey, shared];
 					}),
