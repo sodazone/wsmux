@@ -44,7 +44,7 @@ async function run(
 		websocket: handler,
 	});
 
-	logger.info`Server listening on ${server.hostname}:${server.port}`;
+	logger.info`Server listening on [${server.hostname}]:${server.port}`;
 
 	let stopping = false;
 	const shutdown = () => {
@@ -65,4 +65,7 @@ export const Server = {
 	run,
 };
 
-await Server.run();
+await Server.run({
+	hostname: "::",
+	port: 8181,
+});
