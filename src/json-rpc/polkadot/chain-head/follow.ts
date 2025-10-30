@@ -37,7 +37,6 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 				upstream.subscriptions.getOrCreate(methodKey, {
 					maxSubscribers: MAX_FOLLOWS_PER_UPSTREAM,
 				});
-			const selected = chainHeadSubs.getLeastLoaded();
 
 			async function assignToDownstream(
 				followKey: string,
@@ -65,115 +64,112 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 				});
 			}
 
-			if (chainHeadSubs.shouldCreateMore(selected)) {
-				const followIndex = chainHeadSubs.size();
-				const followKey = `${methodKey}:${followIndex}`;
+			try {
+				const [followKey, shared] = await observeFollow(upstreamId, () =>
+					getOrCreateFollow(`${upstreamId}:${methodKey}`, async () => {
+						let selected = chainHeadSubs.getLeastLoaded();
 
-				try {
-					const shared = await observeFollow(upstreamId, () =>
-						getOrCreateFollow(followKey, async () => {
-							logger.info(
-								(l) =>
-									l`[${upstreamId}:${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
-							);
+						if (selected && !chainHeadSubs.shouldCreateMore(selected)) {
+							return selected;
+						}
 
-							const response = await upstream.request({
-								...request,
-								params: [true],
-							});
+						const followIndex = chainHeadSubs.size();
+						const followKey = `${methodKey}:${followIndex}`;
 
-							if ("error" in response) {
-								const { code, message } = response.error as {
-									code: number;
-									message: string;
-								};
+						logger.info(
+							(l) =>
+								l`[${upstreamId}:${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
+						);
 
-								if (code === -32800) {
-									logger.warn(
-										(l) =>
-											l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message})`,
-									);
-									throw new RateLimitedError(
-										message ?? "Upstream follow limit reached",
-										code,
-									);
-								}
+						const response = await upstream.request({
+							...request,
+							params: [true],
+						});
 
-								throw new Error(`Upstream RPC error ${code}: ${message}`);
-							}
+						if ("error" in response) {
+							const { code, message } = response.error as {
+								code: number;
+								message: string;
+							};
 
-							const upstreamSubId = response.result;
-							if (!upstreamSubId) {
-								throw new Error(
-									`[${upstreamId}:${followKey}] No upstreamSubId in response`,
+							if (code === -32800) {
+								logger.warn(
+									(l) =>
+										l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message})`,
+								);
+								throw new RateLimitedError(
+									message ?? "Upstream follow limit reached",
+									code,
 								);
 							}
 
-							return managers.createSharedSubscription(
-								followKey,
-								upstream,
-								upstreamSubId,
-								chainHeadSubs,
+							throw new Error(`Upstream RPC error ${code}: ${message}`);
+						}
+
+						const upstreamSubId = response.result;
+						if (!upstreamSubId) {
+							throw new Error(
+								`[${upstreamId}:${followKey}] No upstreamSubId in response`,
 							);
-						}),
-					);
-					await assignToDownstream(followKey, shared);
-					return;
-				} catch (err) {
-					if (err instanceof TooManyWaitersError) {
-						downstream.send(
-							jsonRpcError({
-								kind: "RATE_LIMITED",
-								message: "Backpressure: too many concurrent requests",
-								req: request,
-							}),
-						);
-					} else if (err instanceof RateLimitedError) {
-						downstream.send(
-							jsonRpcError({
-								message: err.message,
-								code: err.code,
-								req: request,
-							}),
-						);
-					} else {
-						logger.error(
-							"Error creating follow {clientId} {followKey} {error}",
-							{
-								error: err,
-								clientId,
-								followKey,
-							},
+						}
+						const shared = managers.createSharedSubscription(
+							followKey,
+							upstream,
+							upstreamSubId,
+							chainHeadSubs,
 						);
 
-						downstream.send(
-							jsonRpcError({
-								kind: "INTERNAL_ERROR",
-								message: String(err),
-								req: request,
-							}),
-						);
-					}
-				}
-				return;
-			}
+						selected = chainHeadSubs.getLeastLoaded();
 
-			if (!selected) {
-				downstream.send(
-					jsonRpcError({
-						kind: "RATE_LIMITED",
-						message: "No available follows",
-						req: request,
+						if (selected && selected[1] !== shared) {
+							return selected;
+						}
+
+						return [followKey, shared];
 					}),
 				);
+				await assignToDownstream(followKey, shared);
 				return;
+			} catch (err) {
+				if (err instanceof TooManyWaitersError) {
+					downstream.send(
+						jsonRpcError({
+							kind: "RATE_LIMITED",
+							message: "Backpressure: too many concurrent requests",
+							req: request,
+						}),
+					);
+				} else if (err instanceof RateLimitedError) {
+					downstream.send(
+						jsonRpcError({
+							message: err.message,
+							code: err.code,
+							req: request,
+						}),
+					);
+				} else {
+					logger.error("Error creating follow {clientId} {error}", {
+						error: err,
+						clientId,
+					});
+
+					downstream.send(
+						jsonRpcError({
+							kind: "INTERNAL_ERROR",
+							message: String(err),
+							req: request,
+						}),
+					);
+				}
 			}
 
-			const [followKey, shared] = selected;
-			const localId = downstream.getLocalId(shared.upstreamSubId);
-			if (!shared.hasLocalSubscription(localId)) {
-				await assignToDownstream(followKey, shared);
-			}
+			downstream.send(
+				jsonRpcError({
+					kind: "RATE_LIMITED",
+					message: "No available follows",
+					req: request,
+				}),
+			);
 		},
 	};
 };
