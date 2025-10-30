@@ -28,7 +28,6 @@ export type StateManager = ReturnType<typeof createStateManager>;
 export function createStateManager() {
 	const snapshot: Snapshot = { events: [] };
 	const initialized$ = new ReplaySubject<JSONRPCNotification>(1);
-
 	const tracker = createBlockTracker(512, update);
 
 	function snapshotEvents(upstreamSubId: string) {

@@ -8,6 +8,9 @@ export function createPinnedBlocks() {
 	const pinned = new Map();
 
 	return {
+		unfollow(upstreamSubId: string) {
+			pinned.delete(upstreamSubId);
+		},
 		unsubscribeLocal(upstream: UpstreamServer, localId: string) {
 			const follow = upstream.subscriptions
 				.get("chainHead_v1_follow")
@@ -15,7 +18,11 @@ export function createPinnedBlocks() {
 
 			if (follow) {
 				const upstreamId = follow.upstreamSubId;
-				const stillPinned = pinned.get(upstreamId)!;
+				const stillPinned = pinned.get(upstreamId);
+
+				if (!stillPinned) {
+					return;
+				}
 
 				for (const [hash, set] of stillPinned.entries()) {
 					set.delete(localId);
@@ -31,6 +38,9 @@ export function createPinnedBlocks() {
 							params: [upstreamId, hash],
 						});
 					}
+				}
+				if (stillPinned.size === 0) {
+					pinned.delete(upstreamId);
 				}
 			}
 		},
@@ -48,7 +58,13 @@ export function createPinnedBlocks() {
 				hashes.forEach((hash) => {
 					let set = stillPinned.get(hash);
 
-					if (!set) {
+					if (set) {
+						for (const dead of [...set]) {
+							if (!follow.hasLocalId(dead)) {
+								set.delete(dead);
+							}
+						}
+					} else {
 						// First unpin means all locals were still pinned
 						set = new Set(follow.getLocalIds());
 						stillPinned.set(hash, set);
@@ -68,6 +84,9 @@ export function createPinnedBlocks() {
 						});
 					}
 				});
+				if (stillPinned.size === 0) {
+					pinned.delete(upstreamId);
+				}
 			}
 		},
 	};

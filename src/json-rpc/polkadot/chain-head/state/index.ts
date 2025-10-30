@@ -10,7 +10,7 @@ import { createPinnedBlocks } from "./pinned";
 
 const logger = getLogger(["wsmux", "chainhead", "state"]);
 
-function createStateManagersMap() {
+function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 	const stateManagers = new Map<string, StateManager>();
 	return {
 		get(key: string) {
@@ -39,6 +39,7 @@ function createStateManagersMap() {
 						params: [upstreamSubId],
 					});
 					stateManagers.delete(followKey);
+					onUnfollow(upstreamSubId);
 				},
 			);
 		},
@@ -48,10 +49,13 @@ function createStateManagersMap() {
 export type ChainHeadState = ReturnType<typeof createChainHeadState>;
 
 function createChainHeadState() {
-	const managers = createStateManagersMap();
+	const pinnedBlocks = createPinnedBlocks();
+	const managers = createStateManagersMap((upstreamSubId) => {
+		pinnedBlocks.unfollow(upstreamSubId);
+	});
 	return {
 		managers,
-		pinnedBlocks: createPinnedBlocks(),
+		pinnedBlocks,
 	};
 }
 

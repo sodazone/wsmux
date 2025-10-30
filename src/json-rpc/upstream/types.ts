@@ -18,6 +18,7 @@ export type SharedSubscription = {
 	hasLocalSubscription(localId: string): boolean;
 	hasSubscribers(): boolean;
 	subscribersCount(): number;
+	hasLocalId(localId: string): boolean;
 	getLocalIds(): string[];
 	upstreamSubId: string;
 	abort(): void;

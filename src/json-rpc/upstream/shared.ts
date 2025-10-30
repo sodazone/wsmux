@@ -222,6 +222,10 @@ function _createSharedSubscription(
 			return Array.from(localSubs.keys());
 		},
 
+		hasLocalId(localId: string) {
+			return localSubs.has(localId);
+		},
+
 		subscribeLocal(
 			localId: string,
 			downstream: DownstreamClient,
