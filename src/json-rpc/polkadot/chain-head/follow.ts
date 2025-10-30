@@ -42,22 +42,33 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 				followKey: string,
 				shared: SharedSubscription,
 			) {
+				const localId = downstream.getLocalId(shared.upstreamSubId);
+
+				if (shared.hasLocalSubscription(localId)) {
+					logger.debug(
+						(l) =>
+							l`[${upstreamId}:${shared.upstreamSubId}] ${followKey} already subscribed for ${clientId}`,
+					);
+					return;
+				}
+
 				logger.info(
 					(l) =>
 						l`[${upstreamId}:${shared.upstreamSubId}] ${followKey} assigning ${clientId} (${shared.subscribersCount()} subs)`,
 				);
 
-				const localId = downstream.getLocalId(shared.upstreamSubId);
 				downstream.send({
 					jsonrpc: "2.0",
 					id: request.id ?? null,
 					result: localId,
 				});
+
 				shared.subscribeLocal(
 					localId,
 					downstream,
 					followNotifyTransform(request),
 				);
+
 				upstream.unsubscribers.set(localId, () => {
 					pinnedBlocks.unsubscribeLocal(upstream, localId);
 					shared.unsubscribeLocal(localId);
