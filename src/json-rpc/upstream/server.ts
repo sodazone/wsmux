@@ -146,6 +146,18 @@ export function createUpstreamServer({
 
 		connect,
 
+		async waitForReady(timeoutMs = 10_000) {
+			if (this.isReady()) return Promise.resolve();
+
+			return firstValueFrom(
+				connection$.pipe(
+					filter((ws) => ws?.readyState === WebSocket.OPEN),
+					take(1),
+					timeout(timeoutMs),
+				),
+			).then(() => {});
+		},
+
 		getOrCreateState<T>(id: string, factory: () => T) {
 			if (!states.has(id)) {
 				states.set(id, factory());

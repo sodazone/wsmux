@@ -46,7 +46,12 @@ export function createUpstreamRegistry(
 			clientUpstream.delete(clientId);
 		},
 		connectAll: async () => {
-			await Promise.all(servers.map((server) => server.connect()));
+			await Promise.all(
+				servers.map(async (server) => {
+					await server.connect();
+					await server.waitForReady();
+				}),
+			);
 		},
 		destroy: () => {
 			servers.forEach((server) => {

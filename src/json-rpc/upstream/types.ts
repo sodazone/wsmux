@@ -40,6 +40,7 @@ export type UpstreamServer = {
 	request(req: JSONRPCRequest): Promise<JSONRPCResponse | JSONRPCError>;
 	send(req: JSONRPCRequest): void;
 	isReady(): boolean;
+	waitForReady(): Promise<void>;
 	connect(): Promise<void>;
 	stop(): void;
 	getOrCreateState<T>(id: string, factory: () => T): T;
