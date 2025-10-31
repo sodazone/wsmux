@@ -1,4 +1,4 @@
-import type { JSONRPCRequest } from "./types";
+import type { JSONRPCError, JSONRPCRequest, JSONRPCResponse } from "./types";
 
 export function isJsonRpcRequest(obj: unknown): obj is JSONRPCRequest {
 	if (typeof obj !== "object" || obj === null) return false;
@@ -11,4 +11,10 @@ export function isJsonRpcRequest(obj: unknown): obj is JSONRPCRequest {
 		"id" in o &&
 		(o.id === undefined || typeof o.id === "string" || typeof o.id === "number")
 	);
+}
+
+export function isSuccess(
+	r: JSONRPCResponse | JSONRPCError | null,
+): r is JSONRPCResponse {
+	return !!r && !("error" in r);
 }

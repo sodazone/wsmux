@@ -2,6 +2,7 @@ import type { Observable } from "rxjs";
 import type { DownstreamClient } from "../downstream";
 import type {
 	JSONRPCContextData,
+	JSONRPCError,
 	JSONRPCNotification,
 	JSONRPCRequest,
 	JSONRPCResponse,
@@ -36,7 +37,7 @@ export type UpstreamServer = {
 	unsubscribe: (localId: string) => void;
 	message$: Observable<JSONRPCResponse | JSONRPCNotification>;
 	supportedMethods?: string[];
-	request(req: JSONRPCRequest): Promise<JSONRPCResponse>;
+	request(req: JSONRPCRequest): Promise<JSONRPCResponse | JSONRPCError>;
 	send(req: JSONRPCRequest): void;
 	isReady(): boolean;
 	connect(): Promise<void>;

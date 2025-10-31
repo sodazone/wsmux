@@ -3,6 +3,7 @@ import { BehaviorSubject, firstValueFrom, of, Subject } from "rxjs";
 import { catchError, filter, map, take, timeout } from "rxjs/operators";
 
 import type {
+	JSONRPCError,
 	JSONRPCNotification,
 	JSONRPCRequest,
 	JSONRPCResponse,
@@ -99,9 +100,15 @@ export function createUpstreamServer({
 			}
 
 			const resp$ = message$.pipe(
-				filter((m): m is JSONRPCResponse => "id" in m && m.id === upstreamId),
+				filter(
+					(m): m is JSONRPCResponse | JSONRPCError =>
+						"id" in m && m.id === upstreamId,
+				),
 				take(1),
-				map((response) => ({ ...response, id: req.id }) as JSONRPCResponse),
+				map(
+					(response) =>
+						({ ...response, id: req.id }) as JSONRPCResponse | JSONRPCError,
+				),
 				timeout(10_000),
 				catchError((err) => {
 					logger.warn(
