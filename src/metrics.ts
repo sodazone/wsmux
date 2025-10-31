@@ -8,15 +8,15 @@ export const wsMetrics = {
 		help: "Current number of active WebSocket connections",
 	}),
 	totalConnections: new Counter({
-		name: "wsmux_ws_total_connections",
+		name: "wsmux_ws_connections_total",
 		help: "Total WebSocket connections",
 	}),
 	totalMessages: new Counter({
-		name: "wsmux_ws_total_messages",
+		name: "wsmux_ws_messages_total",
 		help: "Total messages received",
 	}),
 	totalErrors: new Counter({
-		name: "wsmux_ws_total_errors",
+		name: "wsmux_ws_errors_total",
 		help: "Total errors encountered",
 	}),
 	messageDuration: new Histogram({
