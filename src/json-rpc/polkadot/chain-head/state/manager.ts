@@ -163,6 +163,7 @@ export function createStateManager() {
 					}
 
 					if (result.event === "stop") {
+						logger.info((l) => l`Updates completed (stop received)`);
 						subscriber.complete();
 					}
 				},
