@@ -33,10 +33,13 @@ export function createBlockTracker(
 			for (let i = 0; i < pending.length; ) {
 				const msg = pending[i];
 				if (!msg) {
+					i++;
 					continue;
 				}
 				const parent = msg?.params?.result?.parentBlockHash;
 				if (!parent || known.has(parent)) {
+					remember(msg.params?.result?.blockHash);
+
 					pending.splice(i, 1);
 					onApply(msg);
 					applied = true;
