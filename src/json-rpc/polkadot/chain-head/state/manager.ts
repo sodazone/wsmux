@@ -96,7 +96,9 @@ export function createStateManager() {
 	}
 
 	function withUpdater(upstreamSubId: string, upstream: UpstreamServer) {
-		logger.info(`Subscribing to chainHead_v1_followEvent for ${upstreamSubId}`);
+		logger.debug(
+			(l) => l`Subscribing to chainHead_v1_followEvent for ${upstreamSubId}`,
+		);
 
 		const live$ = handleUpdates(
 			upstream.message$.pipe(
@@ -133,7 +135,7 @@ export function createStateManager() {
 						}
 
 						const replayEvents = snapshotEvents(upstreamSubId);
-						logger.info`Replaying ${replayEvents.length} events`;
+						logger.debug((l) => l`Replaying ${replayEvents.length} events`);
 						return concat(from(replayEvents), live$);
 					}),
 				)
