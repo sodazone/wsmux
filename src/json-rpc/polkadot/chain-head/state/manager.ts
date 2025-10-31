@@ -165,7 +165,6 @@ export function createStateManager() {
 
 					if (result.event === "stop") {
 						logger.info((l) => l`Updates completed (stop received)`);
-						// TODO: not cleaning up properly, needs to destroy the shared subscription pool for upstream!
 						cleanup();
 						subscriber.next(value);
 						subscriber.complete();

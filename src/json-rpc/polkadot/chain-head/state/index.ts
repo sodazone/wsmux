@@ -46,7 +46,9 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 				followKey,
 				upstreamSubId,
 				stateManager.withUpdater(upstreamSubId, upstream, () => {
+					// TODO: review everything freed up
 					void cleanup(false);
+					pool.remove(followKey);
 				}),
 				cleanup,
 			);
