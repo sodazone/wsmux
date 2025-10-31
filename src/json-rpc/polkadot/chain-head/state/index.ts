@@ -28,7 +28,10 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 			}
 			const stateManager = stateManagers.get(followKey)!;
 			const cleanup = async (unfollow = true) => {
-				logger.info((l) => l`Unfollowed upstream ${upstreamSubId}`);
+				logger.info(
+					(l) =>
+						l`[${upstreamSubId}] ${unfollow ? "unfollow" : "clean up"} upstream`,
+				);
 				if (unfollow) {
 					await upstream.request({
 						jsonrpc: "2.0",
