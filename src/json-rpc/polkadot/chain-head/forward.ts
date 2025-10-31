@@ -1,8 +1,11 @@
+import { getLogger } from "@logtape/logtape";
 import { createCache } from "../../../util/cache";
 import { jsonRpcError } from "../../errors";
 import type { JSONRPCMethodHandler } from "../../methods";
 import type { JSONRPCRequest, JSONRPCResponse } from "../../types";
 import { isSuccess } from "../../util";
+
+const logger = getLogger(["wsmux", "chain-head", "forward"]);
 
 const forwardChainHeadHandler = ({
 	beforeRequest,
@@ -56,11 +59,7 @@ const forwardChainHeadHandler = ({
 
 			try {
 				const response = await upstream.request(upstreamReq);
-
-				if (isSuccess(response)) {
-					afterResponse?.(req, response);
-				}
-
+				afterResponse?.(req, response);
 				downstream.send(response);
 			} catch (err) {
 				downstream.send(
@@ -92,8 +91,14 @@ export const chainHead_v1_header = (maxSize = 100): JSONRPCMethodHandler => {
 			}
 		},
 		afterResponse: (req, res) => {
-			if (res.result != null && typeof res.result === "string") {
-				cache.set(keyOf(req), res);
+			if (isSuccess(res)) {
+				if (res.result != null && typeof res.result === "string") {
+					cache.set(keyOf(req), res);
+				} else {
+					logger.warn(`Empty response for ${keyOf(req)} ${res.result}`);
+				}
+			} else {
+				logger.error(`Error response for ${keyOf(req)}`);
 			}
 		},
 	});
