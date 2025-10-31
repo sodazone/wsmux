@@ -131,6 +131,7 @@ export function createStateManager() {
 					switchMap((init) => {
 						if (!liveSub.closed) liveSub.unsubscribe();
 						if (!init) {
+							logger.warn("Initialization failed");
 							return EMPTY;
 						}
 
