@@ -5,7 +5,7 @@ import type { JSONRPCMethodHandler } from "../../methods";
 import type { JSONRPCRequest, JSONRPCResponse } from "../../types";
 import { isSuccess } from "../../util";
 
-const logger = getLogger(["wsmux", "chain-head", "forward"]);
+const logger = getLogger(["wsmux", "chainhead", "forward"]);
 
 const forwardChainHeadHandler = ({
 	beforeRequest,
@@ -95,7 +95,9 @@ export const chainHead_v1_header = (maxSize = 100): JSONRPCMethodHandler => {
 				if (res.result != null && typeof res.result === "string") {
 					cache.set(keyOf(req), res);
 				} else {
-					logger.warn(`Empty response for ${keyOf(req)} ${res.result}`);
+					logger.warn(
+						`Empty response for ${keyOf(req)} ${JSON.stringify(res.result)}`,
+					);
 				}
 			} else {
 				logger.error(`Error response for ${keyOf(req)}`);
