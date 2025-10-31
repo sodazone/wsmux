@@ -95,7 +95,11 @@ export function createStateManager() {
 		}
 	}
 
-	function withUpdater(upstreamSubId: string, upstream: UpstreamServer) {
+	function withUpdater(
+		upstreamSubId: string,
+		upstream: UpstreamServer,
+		cleanup: () => void,
+	) {
 		logger.debug(
 			(l) => l`Subscribing to chainHead_v1_followEvent for ${upstreamSubId}`,
 		);
@@ -110,6 +114,7 @@ export function createStateManager() {
 				),
 				map((msg) => msg as JSONRPCNotification),
 			),
+			cleanup,
 		).pipe(share({ resetOnRefCountZero: true }));
 
 		// needed to keep up the initial snapshot
@@ -148,7 +153,10 @@ export function createStateManager() {
 		});
 	}
 
-	function handleUpdates(source$: Observable<JSONRPCNotification>) {
+	function handleUpdates(
+		source$: Observable<JSONRPCNotification>,
+		cleanup: () => void,
+	) {
 		return new Observable<JSONRPCNotification>((subscriber) => {
 			const subscription = source$.subscribe({
 				next(value) {
@@ -157,6 +165,7 @@ export function createStateManager() {
 
 					if (result.event === "stop") {
 						logger.info((l) => l`Updates completed (stop received)`);
+						cleanup();
 						subscriber.next(value);
 						subscriber.complete();
 						return;

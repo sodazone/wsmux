@@ -27,20 +27,25 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 				stateManagers.set(followKey, stateManager);
 			}
 			const stateManager = stateManagers.get(followKey)!;
-			return pool.createSharedSubscription(
-				followKey,
-				upstreamSubId,
-				stateManager.withUpdater(upstreamSubId, upstream),
-				async () => {
-					logger.info((l) => l`Unfollowed upstream ${upstreamSubId}`);
+			const cleanup = async (unfollow = true) => {
+				logger.info((l) => l`Unfollowed upstream ${upstreamSubId}`);
+				if (unfollow) {
 					await upstream.request({
 						jsonrpc: "2.0",
 						method: "chainHead_v1_unfollow",
 						params: [upstreamSubId],
 					});
-					stateManagers.delete(followKey);
-					onUnfollow(upstreamSubId);
-				},
+				}
+				stateManagers.delete(followKey);
+				onUnfollow(upstreamSubId);
+			};
+			return pool.createSharedSubscription(
+				followKey,
+				upstreamSubId,
+				stateManager.withUpdater(upstreamSubId, upstream, () => {
+					void cleanup(false);
+				}),
+				cleanup,
 			);
 		},
 	};

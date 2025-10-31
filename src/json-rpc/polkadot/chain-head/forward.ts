@@ -95,8 +95,9 @@ export const chainHead_v1_header = (maxSize = 100): JSONRPCMethodHandler => {
 				if (res.result != null && typeof res.result === "string") {
 					cache.set(keyOf(req), res);
 				} else {
-					logger.warn(
-						`Empty response for ${keyOf(req)} ${JSON.stringify(res.result)}`,
+					logger.debug(
+						(l) =>
+							l`Empty response for ${keyOf(req)} [req=${JSON.stringify(req)}, res=${JSON.stringify(res)}]`,
 					);
 				}
 			} else {
