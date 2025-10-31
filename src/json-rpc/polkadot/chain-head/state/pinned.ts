@@ -6,6 +6,11 @@ const logger = getLogger(["wsmux", "chainhead", "unpin"]);
 
 const MAX_HASHES_PER_UPSTREAM = 512;
 
+/**
+ * Virtual unpin treats items as pinned by default.
+ * Each caller must unpin individually, and only when the last caller unpins
+ * does the item become fully unpinned.
+ */
 export function createPinnedBlocks() {
 	const pinned = new Map();
 
