@@ -155,16 +155,18 @@ export function createStateManager() {
 					const result = value.params?.result;
 					if (!result) return;
 
+					if (result.event === "stop") {
+						logger.info((l) => l`Updates completed (stop received)`);
+						subscriber.next(value);
+						subscriber.complete();
+						return;
+					}
+
 					update(value);
 
 					const parent = result.parentBlockHash;
 					if (!parent || tracker.known.has(parent)) {
 						subscriber.next(value);
-					}
-
-					if (result.event === "stop") {
-						logger.info((l) => l`Updates completed (stop received)`);
-						subscriber.complete();
 					}
 				},
 				error: (err) => subscriber.error(err),
