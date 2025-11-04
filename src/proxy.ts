@@ -6,6 +6,7 @@ import { createUpstreamRegistry, jsonRpcMiddleware } from "./json-rpc";
 import { polkadotMethods } from "./json-rpc/polkadot";
 import { initLogger } from "./logger";
 import { metricsMiddleware } from "./metrics";
+import { startJscMetrics } from "./runtime/metrics";
 import { createWebSocketHandler } from "./ws";
 
 const logger = getLogger("wsmux");
@@ -27,6 +28,8 @@ async function run(
 			jsonRpcMiddleware(registry, polkadotMethods()),
 		],
 	});
+
+	startJscMetrics();
 
 	const server = Bun.serve({
 		...options,
