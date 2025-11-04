@@ -106,8 +106,11 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							if (code === -32800) {
 								logger.warn(
 									(l) =>
-										l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message})`,
+										l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message}) ${selected?.[0]} ${chainHeadSubs.size()}`,
 								);
+								if (selected) {
+									return selected;
+								}
 								throw new RateLimitedError(
 									message ?? "Upstream follow limit reached",
 									code,
