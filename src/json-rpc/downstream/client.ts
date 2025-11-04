@@ -27,6 +27,9 @@ export function createDownstream(
 		get pendingRequests() {
 			return _pendingRequests;
 		},
+		get closed() {
+			return ws.readyState > 1;
+		},
 		startRequest() {
 			_pendingRequests++;
 			lastRequestTimes.push(Date.now());

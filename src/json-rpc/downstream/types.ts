@@ -13,6 +13,7 @@ export type DownstreamMessage =
 export type DownstreamClient = {
 	clientId: number;
 	pendingRequests: number;
+	closed: boolean;
 	startRequest(): void;
 	endRequest(): void;
 	requestsInPeriod(millis?: number): number;

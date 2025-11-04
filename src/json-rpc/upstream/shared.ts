@@ -200,6 +200,7 @@ function _createSharedSubscription(
 		string,
 		{
 			subscription: Subscription;
+			downstream: DownstreamClient;
 			transform?: (notif: JSONRPCNotification) => JSONRPCNotification;
 		}
 	>();
@@ -257,6 +258,7 @@ function _createSharedSubscription(
 
 			localSubs.set(localId, {
 				subscription,
+				downstream,
 				transform,
 			});
 		},
@@ -286,6 +288,13 @@ function _createSharedSubscription(
 		upstreamSubId,
 
 		subscribersCount() {
+			for (const [localId, entry] of localSubs) {
+				if (entry.downstream.closed) {
+					logger.info`[${localId}] downstream closed`;
+					this.unsubscribeLocal(localId);
+				}
+			}
+
 			return localSubs.size;
 		},
 
