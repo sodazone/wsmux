@@ -35,6 +35,7 @@ export type UpstreamServer = {
 	subscriptions: SharedSubscriptionGroup;
 	unsubscribers: Map<string, () => void>;
 	unsubscribe: (localId: string) => void;
+	unsubscribeAll: (clientId: number) => void;
 	message$: Observable<JSONRPCResponse | JSONRPCNotification>;
 	supportedMethods?: string[];
 	request(req: JSONRPCRequest): Promise<JSONRPCResponse | JSONRPCError>;

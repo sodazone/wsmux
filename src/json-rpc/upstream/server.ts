@@ -131,9 +131,23 @@ export function createUpstreamServer({
 		},
 
 		unsubscribe(localId: string) {
+			logger.info(`[${localId}] unsubscribing`);
+
 			const unsub = unsubscribers.get(localId);
 			if (unsub) unsub();
 			unsubscribers.delete(localId);
+		},
+
+		unsubscribeAll(clientId: number) {
+			logger.info(`[${clientId}] unsubscribing all`);
+
+			const prefix = `${clientId}-`;
+			unsubscribers
+				.keys()
+				.filter((key) => key.startsWith(prefix))
+				.forEach((key) => {
+					this.unsubscribe(key);
+				});
 		},
 
 		async stop() {
