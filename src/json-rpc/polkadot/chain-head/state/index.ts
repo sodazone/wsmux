@@ -53,6 +53,7 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 						// we send up the unfollow, seemingly some RPCs expect that
 						// after stopping
 						void cleanup(true);
+						logger.info`cleanup ${followKey} from pool`;
 						pool.remove(followKey);
 					}),
 					cleanup,

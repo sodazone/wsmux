@@ -130,6 +130,7 @@ function createSharedSubscriptionPool(
 			const sub = subscriptions.get(key);
 			if (sub) {
 				for (const localId of sub.getLocalIds()) {
+					sub.unsubscribeLocal(localId);
 					localIdIndex.delete(localId);
 				}
 			}
