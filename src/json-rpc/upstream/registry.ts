@@ -43,10 +43,6 @@ export function createUpstreamRegistry(
 		servers,
 		resolveUpstream,
 		disconnect: (clientId: number) => {
-			const server = clientUpstream.get(clientId);
-			if (server) {
-				server.unsubscribeAll(clientId);
-			}
 			clientUpstream.delete(clientId);
 		},
 		connectAll: async () => {

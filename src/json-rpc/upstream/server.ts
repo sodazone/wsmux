@@ -138,18 +138,6 @@ export function createUpstreamServer({
 			unsubscribers.delete(localId);
 		},
 
-		unsubscribeAll(clientId: number) {
-			logger.info(`[${clientId}] unsubscribing all`);
-
-			const prefix = `${clientId}-`;
-			unsubscribers
-				.keys()
-				.filter((key) => key.startsWith(prefix))
-				.forEach((key) => {
-					this.unsubscribe(key);
-				});
-		},
-
 		async stop() {
 			logger.info`stopping upstream ${url}`;
 
