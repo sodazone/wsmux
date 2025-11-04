@@ -5,6 +5,7 @@ import type {
 	SharedSubscriptionPool,
 	UpstreamServer,
 } from "../../../upstream";
+import { observeSharedSubscription } from "../metrics/follow.metrics";
 import { createStateManager, type StateManager } from "./manager";
 import { createPinnedBlocks } from "./pinned";
 
@@ -42,16 +43,20 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 				stateManagers.delete(followKey);
 				onUnfollow(upstreamSubId);
 			};
-			return pool.createSharedSubscription(
+			return observeSharedSubscription(
 				followKey,
-				upstreamSubId,
-				stateManager.withUpdater(upstreamSubId, upstream, () => {
-					// we send up the unfollow, seemingly some RPCs expect that
-					// after stopping
-					void cleanup(true);
-					pool.remove(followKey);
-				}),
-				cleanup,
+				upstream.url,
+				pool.createSharedSubscription(
+					followKey,
+					upstreamSubId,
+					stateManager.withUpdater(upstreamSubId, upstream, () => {
+						// we send up the unfollow, seemingly some RPCs expect that
+						// after stopping
+						void cleanup(true);
+						pool.remove(followKey);
+					}),
+					cleanup,
+				),
 			);
 		},
 	};
