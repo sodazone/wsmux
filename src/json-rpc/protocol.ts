@@ -52,14 +52,6 @@ export const jsonRpcMiddleware = (
 		}
 
 		if (client.requestsInPeriod(1_000) >= REQUESTS_PER_SECOND) {
-			client.send(
-				jsonRpcError({
-					kind: "RATE_LIMITED",
-					message: "Rate limit exceeded (wsmux)",
-					req,
-				}),
-			);
-
 			ctx.ws.close(1013, "Rate limit exceeded");
 			return;
 		}
@@ -68,14 +60,6 @@ export const jsonRpcMiddleware = (
 			client.pendingRequests >= MAX_PENDING_PER_CLIENT ||
 			globalPending >= MAX_GLOBAL_PENDING
 		) {
-			client.send(
-				jsonRpcError({
-					kind: "RATE_LIMITED",
-					message: `Too many concurrent requests (${client.pendingRequests} ${globalPending})`,
-					req,
-				}),
-			);
-
 			ctx.ws.close(1013, "Too many concurrent requests");
 			return;
 		}
