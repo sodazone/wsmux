@@ -86,7 +86,7 @@ function createSharedSubscriptionPool(
 			);
 		},
 
-		set(key: string, sub: SharedSubscription) {
+		acquire(key: string, sub: SharedSubscription) {
 			const origSubscribe = sub.subscribeLocal.bind(sub);
 			// TODO: we are recalculating iterating by all subs, potential performance issue
 			// consider using a min heap or priority queue to keep track of the least loaded subscription
@@ -125,7 +125,7 @@ function createSharedSubscriptionPool(
 			}
 		},
 
-		remove(key: string) {
+		release(key: string) {
 			const wasLeast = leastLoaded?.[0] === key;
 			const sub = subscriptions.get(key);
 			if (sub) {
@@ -169,15 +169,8 @@ function createSharedSubscriptionPool(
 			source$: Observable<JSONRPCNotification>,
 			destroy: () => Promise<void> | void,
 		): SharedSubscription {
-			const shared = _createSharedSubscription(
-				upstreamSubId,
-				source$,
-				async () => {
-					await destroy();
-					this.remove(key);
-				},
-			);
-			this.set(key, shared);
+			const shared = _createSharedSubscription(upstreamSubId, source$, destroy);
+			this.acquire(key, shared);
 			return shared;
 		},
 
@@ -196,6 +189,7 @@ function _createSharedSubscription(
 	destroy: () => Promise<void> | void,
 ): SharedSubscription {
 	let aborted = false;
+	let destroyed = false;
 
 	const localSubs = new Map<
 		string,
@@ -205,6 +199,13 @@ function _createSharedSubscription(
 			transform?: (notif: JSONRPCNotification) => JSONRPCNotification;
 		}
 	>();
+
+	const doDestroy = async () => {
+		if (destroyed) return;
+		destroyed = true;
+		await destroy();
+		logger.info`[${upstreamSubId}] destroyed shared subscription pool`;
+	};
 
 	const abort = () => {
 		aborted = true;
@@ -270,19 +271,7 @@ function _createSharedSubscription(
 			localSubs.delete(localId);
 
 			if (!aborted && localSubs.size === 0) {
-				const maybePromise = destroy();
-				if (maybePromise instanceof Promise) {
-					void maybePromise
-						.then(() => {
-							logger.info(
-								"destroyed shared subscription pool for {upstreamSubId}",
-								{
-									upstreamSubId,
-								},
-							);
-						})
-						.catch(() => {});
-				}
+				void doDestroy();
 			}
 		},
 

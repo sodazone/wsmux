@@ -28,7 +28,12 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 				stateManagers.set(followKey, stateManager);
 			}
 			const stateManager = stateManagers.get(followKey)!;
+
+			let cleaned = false;
 			const cleanup = async (unfollow = true) => {
+				if (cleaned) return;
+				cleaned = true;
+
 				logger.info(
 					(l) =>
 						l`[${upstreamSubId}] ${unfollow ? "unfollow" : "clean up"} upstream`,
@@ -40,6 +45,7 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 						params: [upstreamSubId],
 					});
 				}
+				pool.release(followKey);
 				stateManagers.delete(followKey);
 				onUnfollow(upstreamSubId);
 			};
@@ -54,7 +60,6 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 						// after stopping
 						void cleanup(true);
 						logger.info`cleanup ${followKey} from pool`;
-						pool.remove(followKey);
 					}),
 					cleanup,
 				),
