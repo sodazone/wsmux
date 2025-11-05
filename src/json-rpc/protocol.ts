@@ -26,7 +26,7 @@ export const jsonRpcMiddleware = (
 			if (client.clientId !== undefined) {
 				registry.disconnect(client.clientId);
 			}
-			client.close?.();
+			client.onClose?.();
 		}
 		await next();
 	},
@@ -86,7 +86,7 @@ export const jsonRpcMiddleware = (
 		try {
 			const upstream = registry.resolveUpstream(ctx.ws.data, req.method);
 			if (!upstream) {
-				client.send(jsonRpcError({ kind: "METHOD_NOT_FOUND", req }));
+				client.close(1013, "Upstream Unavailable");
 				return;
 			}
 
