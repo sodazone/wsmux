@@ -7,7 +7,6 @@ const JSONRPCErrorCodes = {
 	INVALID_PARAMS: { code: -32602, message: "Invalid params" },
 	INTERNAL_ERROR: { code: -32603, message: "Internal error" },
 	SERVER_ERROR: { code: -32000, message: "Server error" },
-	RATE_LIMITED: { code: -32004, message: "Rate limited" },
 } as const;
 
 export type JSONRPCErrorCode = keyof typeof JSONRPCErrorCodes;
@@ -52,11 +51,7 @@ export function jsonRpcError(
 }
 
 export class RateLimitedError extends Error {
-	code: number;
-
-	constructor(message = "Rate limit reached", code = -32004) {
+	constructor(message = "Rate limit reached") {
 		super(message);
-		this.name = "RateLimited";
-		this.code = code;
 	}
 }

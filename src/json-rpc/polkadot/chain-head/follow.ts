@@ -25,6 +25,8 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 		label: methodKey,
 	});
 
+	const followLimitReached = new Set<string>();
+
 	return {
 		async handleRequest(upstream, downstream, request) {
 			const { managers, pinnedBlocks } = chainHeadStateFrom(upstream);
@@ -72,6 +74,10 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 				upstream.unsubscribers.set(localId, () => {
 					pinnedBlocks.unsubscribeLocal(upstream, localId);
 					shared.unsubscribeLocal(localId);
+
+					if (shared.subscribersCount() === 0) {
+						followLimitReached.delete(upstreamId);
+					}
 				});
 			}
 
@@ -79,6 +85,11 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 				const [followKey, shared] = await observeFollow(upstreamId, () =>
 					getOrCreateFollow(`${upstreamId}:${methodKey}`, async () => {
 						const selected = chainHeadSubs.getLeastLoaded();
+
+						if (followLimitReached.has(upstreamId)) {
+							if (selected) return selected;
+							throw new RateLimitedError("Upstream follow limit reached");
+						}
 
 						if (selected && !chainHeadSubs.shouldCreateMore(selected)) {
 							return selected;
@@ -104,6 +115,8 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 							};
 
 							if (code === -32800) {
+								followLimitReached.add(upstreamId);
+
 								logger.warn(
 									(l) =>
 										l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message}) ${selected?.[0]} ${chainHeadSubs.size()}`,
@@ -113,7 +126,6 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 								}
 								throw new RateLimitedError(
 									message ?? "Upstream follow limit reached",
-									code,
 								);
 							}
 
@@ -138,19 +150,14 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 				);
 				await assignToDownstream(followKey, shared);
 			} catch (err) {
-				if (err instanceof TooManyWaitersError) {
-					downstream.send(
-						jsonRpcError({
-							kind: "RATE_LIMITED",
-							message: "Backpressure: too many concurrent requests",
-							req: request,
-						}),
-					);
-				} else if (err instanceof RateLimitedError) {
+				if (
+					err instanceof RateLimitedError ||
+					err instanceof TooManyWaitersError
+				) {
 					downstream.send(
 						jsonRpcError({
 							message: err.message,
-							code: err.code,
+							code: -32800,
 							req: request,
 						}),
 					);
