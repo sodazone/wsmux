@@ -66,7 +66,6 @@ export function createStateManager() {
 				break;
 			}
 			case "newBlock": {
-				if (!tracker.handleNewBlock(msg)) return;
 				snapshot.events.push(msg);
 				break;
 			}
