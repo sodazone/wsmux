@@ -59,6 +59,8 @@ export const jsonRpcMiddleware = (
 					req,
 				}),
 			);
+
+			ctx.ws.close(1013, "Rate limit exceeded");
 			return;
 		}
 
@@ -73,6 +75,8 @@ export const jsonRpcMiddleware = (
 					req,
 				}),
 			);
+
+			ctx.ws.close(1013, "Too many concurrent requests");
 			return;
 		}
 
