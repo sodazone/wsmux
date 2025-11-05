@@ -35,7 +35,9 @@ export function createPinnedBlocks() {
 					set.delete(localId);
 
 					if (set.size === 0) {
-						logger.info`[${upstreamSubId}] unpinned block ${hash} (unsubscribe)`;
+						logger.debug(
+							(l) => l`[${upstreamSubId}] unpinned block ${hash} (unsubscribe)`,
+						);
 
 						stillPinned.delete(hash);
 
