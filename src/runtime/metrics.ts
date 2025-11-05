@@ -53,6 +53,11 @@ const jscMetrics = {
 		name: "bun_heap_protected_global_object_count",
 		help: "Protected global objects",
 	}),
+
+	processRss: new Gauge({
+		name: "bun_process_resident_memory_bytes",
+		help: "Resident set size (RSS) of the Bun process in bytes",
+	}),
 };
 
 export function startJscMetrics(intervalMs = 5_000) {
@@ -75,5 +80,7 @@ export function startJscMetrics(intervalMs = 5_000) {
 
 		jscMetrics.globals.set(heap.globalObjectCount);
 		jscMetrics.globalsProtected.set(heap.protectedGlobalObjectCount);
+
+		jscMetrics.processRss.set(process.memoryUsage.rss());
 	}, intervalMs).unref();
 }
