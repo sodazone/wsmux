@@ -92,7 +92,9 @@ export function createUpstreamServer({
 			ws.send(JSON.stringify(req));
 		},
 
-		async request(req: JSONRPCRequest): Promise<JSONRPCResponse> {
+		async request(
+			req: JSONRPCRequest,
+		): Promise<JSONRPCResponse | JSONRPCError> {
 			const upstreamId = server.nextId++;
 			const ws = connection$.value;
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -121,13 +123,27 @@ export function createUpstreamServer({
 
 			ws.send(JSON.stringify({ ...req, id: upstreamId }));
 
-			const response = await firstValueFrom(resp$);
+			try {
+				const response = await firstValueFrom(resp$);
 
-			if (!response) {
-				throw new Error("No response from upstream (disconnected or timeout)");
+				if (!response) {
+					// TODO impl
+					throw new Error(
+						"No response from upstream (disconnected or timeout)",
+					);
+				}
+
+				return response;
+			} catch (error) {
+				if (stopped) {
+					return {
+						jsonrpc: "2.0",
+						id: null,
+						error: { code: -32000, message: "Upstream stopped" },
+					};
+				}
+				throw error;
 			}
-
-			return response;
 		},
 
 		unsubscribe(localId: string) {
