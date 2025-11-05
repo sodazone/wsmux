@@ -19,6 +19,7 @@ export type DownstreamClient = {
 	requestsInPeriod(millis?: number): number;
 	getLocalId(suffix: string): string;
 	send(message: DownstreamMessage): number;
+	close(code?: number, reason?: string): void;
 	addCloseFn(closeFn: () => void): void;
-	close(): void;
+	onClose(): void;
 };

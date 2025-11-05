@@ -58,10 +58,13 @@ export function createDownstream(
 		addCloseFn: (closeFn: () => void) => {
 			closeFns.add(closeFn);
 		},
-		close: () => {
-			closeFns.forEach((closeFn) => {
+		close: (code = 1000, reason = "Normal Closure") => {
+			ws.close(code, reason);
+		},
+		onClose: () => {
+			for (const closeFn of closeFns) {
 				closeFn();
-			});
+			}
 		},
 	};
 }
