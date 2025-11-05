@@ -171,12 +171,17 @@ export function createStateManager() {
 						return;
 					}
 
-					update(value);
-
-					const parent = result.parentBlockHash;
-					if (!parent || tracker.known.has(parent)) {
-						subscriber.next(value);
+					if (result.event === "newBlock") {
+						// ordering handled here
+						if (tracker.handleNewBlock(value)) {
+							update(value);
+							subscriber.next(value);
+						}
+						return;
 					}
+
+					update(value);
+					subscriber.next(value);
 				},
 				error: (err) => subscriber.error(err),
 				complete: () => subscriber.complete(),
