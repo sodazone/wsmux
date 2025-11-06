@@ -176,38 +176,56 @@ export function createStateManager() {
 		cleanup: () => void,
 	) {
 		return new Observable<JSONRPCNotification>((subscriber) => {
-			const subscription = source$.subscribe({
-				next(value) {
-					const result = value.params?.result;
-					if (!result) return;
+			const FOLLOW_TIMEOUT_MS = 60_000;
 
-					if (result.event === "stop") {
-						logger.info((l) => l`Updates completed (stop received)`);
+			const subscription = source$
+				.pipe(
+					timeout({
+						each: FOLLOW_TIMEOUT_MS,
+						with: () => {
+							logger.warn(
+								(l) =>
+									l`Watchdog timeout: no chainHead events for ${FOLLOW_TIMEOUT_MS}ms. Resetting state.`,
+							);
+							// trigger a full restart
+							resetState();
+							cleanup();
+							return EMPTY;
+						},
+					}),
+				)
+				.subscribe({
+					next(value) {
+						const result = value.params?.result;
+						if (!result) return;
 
-						subscriber.next(value);
-						subscriber.complete();
+						if (result.event === "stop") {
+							logger.info((l) => l`Updates completed (stop received)`);
 
-						resetState();
-						cleanup();
-
-						return;
-					}
-
-					if (result.event === "newBlock") {
-						// ordering handled here
-						if (tracker.handleNewBlock(value)) {
-							update(value);
 							subscriber.next(value);
-						}
-						return;
-					}
+							subscriber.complete();
 
-					update(value);
-					subscriber.next(value);
-				},
-				error: (err) => subscriber.error(err),
-				complete: () => subscriber.complete(),
-			});
+							resetState();
+							cleanup();
+
+							return;
+						}
+
+						if (result.event === "newBlock") {
+							// ordering handled here
+							if (tracker.handleNewBlock(value)) {
+								update(value);
+								subscriber.next(value);
+							}
+							return;
+						}
+
+						update(value);
+						subscriber.next(value);
+					},
+					error: (err) => subscriber.error(err),
+					complete: () => subscriber.complete(),
+				});
 
 			return () => subscription.unsubscribe();
 		});
