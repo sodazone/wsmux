@@ -3,15 +3,21 @@ import { parseArgs } from "node:util";
 // NOTE: Bun automatically loads .env
 
 const DEFAULTS = {
-	config: process.env.WSMUX_CONFIG ?? "./config.yaml",
+	config: process.env.WSMUX_CONFIG ?? "./wsmux.config.yaml",
 	verbosity: parseInt(process.env.WSMUX_VERBOSE || "0", 10),
 	listen: process.env.WSMUX_LISTEN || ":8181",
 };
 
+/**
+ * Parses a TCP listen address string into hostname and port.
+ * Supported formats: [::1]:9000, host:port, :port
+ *
+ * @param raw The raw listen address string.
+ * @returns An object with hostname and port properties.
+ */
 function parseTcpListen(raw: string): { hostname: string; port: number } {
 	if (!raw) throw new Error("Empty listen value");
 
-	// [::1]:9000
 	const ipv6 = raw.match(/^\[(.*)\]:(\d+)$/);
 	if (ipv6) {
 		return {
@@ -20,7 +26,6 @@ function parseTcpListen(raw: string): { hostname: string; port: number } {
 		};
 	}
 
-	// "host:port" or ":port"
 	const idx = raw.lastIndexOf(":");
 	if (idx === -1) {
 		throw new Error(
