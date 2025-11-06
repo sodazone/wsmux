@@ -44,9 +44,6 @@ export function createUpstreamRegistry(
 		lastIndex = (lastIndex + 1) % candidates.length;
 		const server = candidates[lastIndex]!;
 
-		client.addCloseFn(() => {
-			server.connections.dec();
-		});
 		clientUpstream.set(clientId, server);
 		server.connections.inc();
 
@@ -57,11 +54,11 @@ export function createUpstreamRegistry(
 		servers,
 		resolveUpstream,
 		disconnect: (clientId: number) => {
-			clientUpstream.delete(clientId);
 			const server = clientUpstream.get(clientId);
 			if (server) {
 				server.connections.dec();
 			}
+			clientUpstream.delete(clientId);
 		},
 		connectAll: async () => {
 			await Promise.all(
