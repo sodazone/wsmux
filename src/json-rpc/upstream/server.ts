@@ -11,6 +11,11 @@ import type {
 import { createSharedSubscriptionGroup } from "./shared";
 import type { UpstreamServer, UpstreamServerConfig } from "./types";
 
+const REQUEST_TIMEOUT_MS = 10_000;
+const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
+const DEFAULT_RETRY_DELAY_MS = 2_000;
+const DEFAULT_MAX_CONNECTIONS = 200;
+
 const logger = getLogger(["wsmux", "upstream"]);
 
 function createMessageSubject() {
@@ -20,8 +25,8 @@ function createMessageSubject() {
 export function createUpstreamServer({
 	url,
 	supportedMethods,
-	maxConnections = 200,
-	retryDelay = 2000,
+	maxConnections = DEFAULT_MAX_CONNECTIONS,
+	retryDelay = DEFAULT_RETRY_DELAY_MS,
 }: UpstreamServerConfig): UpstreamServer {
 	const connection$ = new BehaviorSubject<WebSocket | null>(null);
 	const unsubscribers = new Map<string, () => void>();
@@ -31,6 +36,7 @@ export function createUpstreamServer({
 
 	let stopped = false;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	let unhealthy = false;
 	let _connections = 0;
 
 	function cleanup() {
@@ -49,6 +55,7 @@ export function createUpstreamServer({
 
 		ws.onopen = () => {
 			logger.info`[${url}] connected ok`;
+			unhealthy = false;
 			connection$.next(ws);
 		};
 
@@ -92,7 +99,7 @@ export function createUpstreamServer({
 
 		isReady: () => {
 			const ws = connection$.value;
-			return ws?.readyState === WebSocket.OPEN;
+			return ws?.readyState === WebSocket.OPEN && !unhealthy;
 		},
 
 		hasCapacity: () => {
@@ -129,29 +136,31 @@ export function createUpstreamServer({
 					(response) =>
 						({ ...response, id: req.id }) as JSONRPCResponse | JSONRPCError,
 				),
-				timeout(10_000),
+				timeout(REQUEST_TIMEOUT_MS),
 				catchError((err) => {
 					logger.warn(
 						"[{url}] Request {method} stream aborted or timed out {err}",
 						{ url, err, method: req.method },
 					);
-					return of(null);
+
+					unhealthy = true;
+					connection$.value?.close(4001, "Request timeout");
+
+					return of({
+						jsonrpc: "2.0",
+						id: req.id,
+						error: {
+							code: -32000,
+							message: `Upstream timeout for method ${req.method}`,
+						},
+					} as JSONRPCError);
 				}),
 			);
 
 			ws.send(JSON.stringify({ ...req, id: upstreamId }));
 
 			try {
-				const response = await firstValueFrom(resp$);
-
-				if (!response) {
-					// TODO impl
-					throw new Error(
-						"No response from upstream (disconnected or timeout)",
-					);
-				}
-
-				return response;
+				return await firstValueFrom(resp$);
 			} catch (error) {
 				if (stopped) {
 					return {
@@ -182,7 +191,7 @@ export function createUpstreamServer({
 
 		connect,
 
-		async waitForReady(timeoutMs = 10_000) {
+		async waitForReady(timeoutMs = DEFAULT_CONNECTION_TIMEOUT_MS) {
 			if (this.isReady()) return Promise.resolve();
 
 			return firstValueFrom(
