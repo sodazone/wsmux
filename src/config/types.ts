@@ -8,7 +8,7 @@ export type UpstreamConfig = {
 	};
 };
 
-export type PoolOptions = {
+export type SubscriptionOptions = {
 	maxSubscribers?: number;
 };
 
@@ -16,6 +16,6 @@ export type ProxyConfig = {
 	maxOpenSockets?: number;
 	logLevel?: "trace" | "debug" | "info" | "warn" | "error";
 
-	upstreams: UpstreamConfig[];
-	pool?: PoolOptions;
+	upstream: UpstreamConfig[];
+	subscription?: SubscriptionOptions;
 };
