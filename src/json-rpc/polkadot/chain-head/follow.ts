@@ -14,8 +14,9 @@ import { observeFollow } from "./metrics/follow.metrics";
 import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
+const MAX_FOLLOWS_PER_UPSTREAM = 4;
+
 const logger = getLogger("wsmux.chainhead.follow");
-const MAX_FOLLOWS_PER_UPSTREAM = 2;
 
 export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 	const methodKey = "chainHead_v1_follow";

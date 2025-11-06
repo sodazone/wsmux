@@ -27,15 +27,34 @@ export type StateManager = ReturnType<typeof createStateManager>;
 
 export function createStateManager() {
 	const snapshot: Snapshot = { events: [] };
-	const initialized$ = new ReplaySubject<JSONRPCNotification>(1);
 	const tracker = createBlockTracker(512, update);
 
+	let initialized$ = new ReplaySubject<JSONRPCNotification>(1);
+
+	function resetState() {
+		snapshot.initialized = undefined;
+		snapshot.finalized = undefined;
+		snapshot.runtime = undefined;
+		snapshot.events = [];
+
+		tracker.known.clear();
+		tracker.flushPending();
+
+		initialized$.complete();
+		initialized$ = new ReplaySubject<JSONRPCNotification>(1);
+	}
+
 	function snapshotEvents(upstreamSubId: string) {
+		if (!snapshot.initialized) {
+			logger.warn`[${upstreamSubId}] snapshot not initialized`;
+			return [];
+		}
+
 		return [
 			{
-				...snapshot.initialized!,
+				...snapshot.initialized,
 				params: {
-					...snapshot.initialized!.params,
+					...snapshot.initialized.params,
 					subscription: upstreamSubId,
 				},
 			},
@@ -133,7 +152,6 @@ export function createStateManager() {
 			const sub = waitInit$
 				.pipe(
 					switchMap((init) => {
-						if (!liveSub.closed) liveSub.unsubscribe();
 						if (!init) {
 							logger.warn("Initialization failed");
 							return EMPTY;
@@ -148,6 +166,7 @@ export function createStateManager() {
 
 			return () => {
 				sub.unsubscribe();
+				if (!liveSub.closed) liveSub.unsubscribe();
 			};
 		});
 	}
@@ -164,9 +183,13 @@ export function createStateManager() {
 
 					if (result.event === "stop") {
 						logger.info((l) => l`Updates completed (stop received)`);
-						cleanup();
+
 						subscriber.next(value);
 						subscriber.complete();
+
+						resetState();
+						cleanup();
+
 						return;
 					}
 
