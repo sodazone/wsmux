@@ -20,6 +20,7 @@ function createMessageSubject() {
 export function createUpstreamServer({
 	url,
 	supportedMethods,
+	maxConnections = 200,
 	retryDelay = 2000,
 }: UpstreamServerConfig): UpstreamServer {
 	const connection$ = new BehaviorSubject<WebSocket | null>(null);
@@ -30,12 +31,14 @@ export function createUpstreamServer({
 
 	let stopped = false;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+	let _connections = 0;
 
 	function cleanup() {
 		if (reconnectTimer) clearTimeout(reconnectTimer);
 		unsubscribers.clear();
 		states.clear();
 		subscriptions.abort();
+		_connections = 0;
 	}
 
 	async function connect() {
@@ -70,6 +73,15 @@ export function createUpstreamServer({
 		};
 	}
 
+	const connections = {
+		inc() {
+			_connections++;
+		},
+		dec() {
+			_connections = Math.max(0, _connections - 1);
+		},
+	};
+
 	const server: UpstreamServer = {
 		url,
 		nextId: 0,
@@ -82,6 +94,12 @@ export function createUpstreamServer({
 			const ws = connection$.value;
 			return ws?.readyState === WebSocket.OPEN;
 		},
+
+		hasCapacity: () => {
+			return _connections < maxConnections;
+		},
+
+		connections,
 
 		send(req: JSONRPCRequest) {
 			const ws = connection$.value;

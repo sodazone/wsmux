@@ -40,6 +40,11 @@ export type UpstreamServer = {
 	request(req: JSONRPCRequest): Promise<JSONRPCResponse | JSONRPCError>;
 	send(req: JSONRPCRequest): void;
 	isReady(): boolean;
+	hasCapacity(): boolean;
+	connections: {
+		inc(): void;
+		dec(): void;
+	};
 	waitForReady(): Promise<void>;
 	connect(): Promise<void>;
 	stop(): void;
@@ -48,6 +53,7 @@ export type UpstreamServer = {
 
 export type UpstreamServerConfig = {
 	url: string;
+	maxConnections?: number;
 	supportedMethods?: string[];
 	retryDelay?: number;
 };

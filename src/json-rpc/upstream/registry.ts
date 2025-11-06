@@ -1,12 +1,13 @@
 import type { JSONRPCContextData } from "../types";
 import { createUpstreamServer } from "./server";
-import type { UpstreamRegistry, UpstreamServer } from "./types";
+import type {
+	UpstreamRegistry,
+	UpstreamServer,
+	UpstreamServerConfig,
+} from "./types";
 
 export function createUpstreamRegistry(
-	configs: {
-		url: string;
-		supportedMethods?: string[];
-	}[],
+	configs: UpstreamServerConfig[],
 ): UpstreamRegistry {
 	const servers = configs.map(createUpstreamServer);
 	const clientUpstream = new Map<number, UpstreamServer>();
@@ -21,12 +22,15 @@ export function createUpstreamRegistry(
 		if (clientUpstream.has(clientId)) {
 			const server = clientUpstream.get(clientId)!;
 			if (server.isReady()) return server;
+
 			clientUpstream.delete(clientId);
+			server.connections.dec();
 		}
 
 		const candidates = servers.filter(
 			(s) =>
 				s.isReady() &&
+				s.hasCapacity() &&
 				(s.supportedMethods === undefined ||
 					s.supportedMethods.includes(method)),
 		);
@@ -36,6 +40,8 @@ export function createUpstreamRegistry(
 		const server = candidates[lastIndex]!;
 
 		clientUpstream.set(clientId, server);
+		server.connections.inc();
+
 		return server;
 	};
 
@@ -44,6 +50,10 @@ export function createUpstreamRegistry(
 		resolveUpstream,
 		disconnect: (clientId: number) => {
 			clientUpstream.delete(clientId);
+			const server = clientUpstream.get(clientId);
+			if (server) {
+				server.connections.dec();
+			}
 		},
 		connectAll: async () => {
 			await Promise.all(
