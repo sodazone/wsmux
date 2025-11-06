@@ -14,7 +14,12 @@ export function createUpstreamRegistry(
 	let lastIndex = -1;
 
 	const resolveUpstream = (ctx: JSONRPCContextData, method: string) => {
-		const clientId = ctx.client?.clientId;
+		const client = ctx.client;
+		if (client === undefined) {
+			return undefined;
+		}
+
+		const clientId = client.clientId;
 		if (clientId === undefined) {
 			return undefined;
 		}
@@ -39,6 +44,9 @@ export function createUpstreamRegistry(
 		lastIndex = (lastIndex + 1) % candidates.length;
 		const server = candidates[lastIndex]!;
 
+		client.addCloseFn(() => {
+			server.connections.dec();
+		});
 		clientUpstream.set(clientId, server);
 		server.connections.inc();
 
