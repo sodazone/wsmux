@@ -1,0 +1,78 @@
+import { parseArgs } from "node:util";
+
+// NOTE: Bun automatically loads .env
+
+const DEFAULTS = {
+	config: process.env.WSMUX_CONFIG ?? "./config.yaml",
+	verbosity: parseInt(process.env.WSMUX_VERBOSE || "0", 10),
+	listen: process.env.WSMUX_LISTEN || ":8181",
+};
+
+function parseTcpListen(raw: string): { hostname: string; port: number } {
+	if (!raw) throw new Error("Empty listen value");
+
+	// [::1]:9000
+	const ipv6 = raw.match(/^\[(.*)\]:(\d+)$/);
+	if (ipv6) {
+		return {
+			hostname: ipv6[1] ?? "::",
+			port: Number(ipv6[2]),
+		};
+	}
+
+	// "host:port" or ":port"
+	const idx = raw.lastIndexOf(":");
+	if (idx === -1) {
+		throw new Error(
+			`Invalid --listen value "${raw}" (expected host:port or :port)`,
+		);
+	}
+
+	const hostname = raw.slice(0, idx) ?? "0.0.0.0";
+	const port = Number(raw.slice(idx + 1));
+
+	if (port < 1 || port > 65535) {
+		throw new Error(`Invalid port in --listen "${raw}" (${port})`);
+	}
+
+	return { hostname, port };
+}
+
+export function getOpts() {
+	const { values, positionals } = parseArgs({
+		args: Bun.argv.slice(2),
+		options: {
+			help: { type: "boolean", short: "h" },
+			config: { type: "string", short: "c" },
+			verbose: { type: "boolean", short: "v", multiple: true },
+			listen: { type: "string", short: "l" },
+		},
+		strict: true,
+		allowPositionals: true,
+	});
+
+	if (values.help) {
+		console.log(`
+Usage: wsmux [options]
+
+Options:
+  -c, --config <path>   Configuration file
+  -l, --listen <addr>   Listening address (host:port, :port, [::]:port)
+  -v                    Increase verbosity (repeatable)
+  -h, --help            Show this help message
+
+Environment variables:
+  WSMUX_CONFIG          Path to config file
+  WSMUX_LISTEN          Default listen address
+  WSMUX_VERBOSE         Verbosity (0-3)
+`);
+		process.exit(0);
+	}
+
+	return {
+		config: values.config ?? DEFAULTS.config,
+		listen: parseTcpListen(values.listen ? values.listen : DEFAULTS.listen),
+		verbosity: values.verbose ? values.verbose.length : DEFAULTS.verbosity,
+		positionals,
+	};
+}

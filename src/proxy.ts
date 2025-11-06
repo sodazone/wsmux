@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import client from "prom-client";
-
+import { getOpts } from "./cli/opts";
 import type { JSONRPCContextData } from "./json-rpc";
 import { createUpstreamRegistry, jsonRpcMiddleware } from "./json-rpc";
 import { polkadotMethods } from "./json-rpc/polkadot";
@@ -68,7 +68,7 @@ export const Server = {
 	run,
 };
 
+const opts = getOpts();
 await Server.run({
-	hostname: "::",
-	port: 8181,
+	...opts.listen,
 });
