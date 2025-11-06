@@ -1,3 +1,6 @@
+// DRAFT: to be defined properly
+// ---
+
 export type UpstreamConfig = {
 	name: string;
 	url: string;
@@ -8,6 +11,8 @@ export type UpstreamConfig = {
 	};
 };
 
+// TODO: maybe per method configurations
+// under polkadot rpc key?
 export type SubscriptionOptions = {
 	maxSubscribers?: number;
 };
