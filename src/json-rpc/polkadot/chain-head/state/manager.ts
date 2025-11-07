@@ -240,7 +240,10 @@ export function createStateManager() {
 						if (!result) return;
 
 						if (result.event === "stop") {
-							logger.info((l) => l`Updates completed (stop received)`);
+							logger.info(
+								(l) =>
+									l`[${value.params.subscription ?? "?"}] updates completed (stop)`,
+							);
 
 							subscriber.next(value);
 							subscriber.complete();
