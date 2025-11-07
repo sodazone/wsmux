@@ -60,6 +60,7 @@ function setConfig(c: NormalizedConfig) {
 
 export async function loadConfig(path = "./wsmux.config.yaml") {
 	try {
+		// TODO: user friendly message and usage when config is not found or invalid
 		const text = await Bun.file(path).text();
 		const raw = YAML.parse(text) as ProxyConfig;
 		const normalized = normalizeConfig(raw);
