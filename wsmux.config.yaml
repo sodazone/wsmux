@@ -1,0 +1,23 @@
+log_level: info
+upstream:
+  - name: chaos
+    url: ws://localhost:9944
+    request_timeout: 5s
+    connection_timeout: 10s
+    max_connections: 100
+    retry_delay: 1s
+  - name: stakeworld
+    url: wss://dot-rpc.stakeworld.io
+    methods:
+      - chainHead_v1_follow:
+          max_subscribers: 4
+  - name: helix
+    url: wss://rpc-polkadot.helixstreet.io
+    supported_methods: "*"
+    methods:
+      - chainHead_v1_follow:
+          max_subscribers: 4
+json_rpc:
+  max_pending_requests_per_connection: 50
+  max_pending_requests: 500
+  max_requests_per_second: 20

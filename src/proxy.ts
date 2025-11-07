@@ -1,31 +1,31 @@
 import { getLogger } from "@logtape/logtape";
 import client from "prom-client";
+
 import { getOpts } from "./cli/opts";
+import { loadConfig } from "./config";
 import type { JSONRPCContextData } from "./json-rpc";
-import { createUpstreamRegistry, jsonRpcMiddleware } from "./json-rpc";
+import { createJsonRpcMiddleware, createUpstreamRegistry } from "./json-rpc";
 import { polkadotMethods } from "./json-rpc/polkadot";
 import { initLogger } from "./logger";
 import { metricsMiddleware } from "./metrics";
 import { startJscMetrics } from "./runtime/metrics";
 import { createWebSocketHandler } from "./ws";
 
-const logger = getLogger("wsmux");
-
 async function run(
 	options: Bun.Serve.HostnamePortServeOptions<JSONRPCContextData> = {},
 ) {
+	const config = await loadConfig();
 	await initLogger();
 
-	const registry = createUpstreamRegistry([
-		{ url: "wss://dot-rpc.stakeworld.io" },
-		{ url: "wss://rpc-polkadot.helixstreet.io" },
-	]);
+	const logger = getLogger("wsmux");
+
+	const registry = createUpstreamRegistry(config.upstream);
 	await registry.connectAll();
 
 	const handler = createWebSocketHandler<JSONRPCContextData>({
 		middlewares: [
 			metricsMiddleware(),
-			jsonRpcMiddleware(registry, polkadotMethods()),
+			createJsonRpcMiddleware(registry, polkadotMethods()),
 		],
 	});
 

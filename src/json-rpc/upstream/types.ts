@@ -39,6 +39,9 @@ export type UpstreamServer = {
 	supportedMethods?: string[];
 	request(req: JSONRPCRequest): Promise<JSONRPCResponse | JSONRPCError>;
 	send(req: JSONRPCRequest): void;
+	config: {
+		methods?: Record<string, any>;
+	};
 	isReady(): boolean;
 	hasCapacity(): boolean;
 	connections: {
@@ -52,10 +55,14 @@ export type UpstreamServer = {
 };
 
 export type UpstreamServerConfig = {
+	name: string;
 	url: string;
+	requestTimeout?: number;
+	connectionTimeout?: number;
 	maxConnections?: number;
 	supportedMethods?: string[];
 	retryDelay?: number;
+	methods?: Record<string, any>;
 };
 
 export type UpstreamRegistry = {

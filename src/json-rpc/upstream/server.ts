@@ -11,7 +11,7 @@ import type {
 import { createSharedSubscriptionGroup } from "./shared";
 import type { UpstreamServer, UpstreamServerConfig } from "./types";
 
-const REQUEST_TIMEOUT_MS = 10_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRY_DELAY_MS = 2_000;
 const DEFAULT_MAX_CONNECTIONS = 200;
@@ -25,6 +25,9 @@ function createMessageSubject() {
 export function createUpstreamServer({
 	url,
 	supportedMethods,
+	methods,
+	requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS,
+	connectionTimeout = DEFAULT_CONNECTION_TIMEOUT_MS,
 	maxConnections = DEFAULT_MAX_CONNECTIONS,
 	retryDelay = DEFAULT_RETRY_DELAY_MS,
 }: UpstreamServerConfig): UpstreamServer {
@@ -92,6 +95,9 @@ export function createUpstreamServer({
 	const server: UpstreamServer = {
 		url,
 		nextId: 0,
+		config: {
+			methods,
+		},
 		supportedMethods,
 		subscriptions,
 		unsubscribers,
@@ -136,7 +142,7 @@ export function createUpstreamServer({
 					(response) =>
 						({ ...response, id: req.id }) as JSONRPCResponse | JSONRPCError,
 				),
-				timeout(REQUEST_TIMEOUT_MS),
+				timeout(requestTimeout),
 				catchError((err) => {
 					logger.warn(
 						"[{url}] Request {method} stream aborted or timed out {err}",
@@ -191,7 +197,7 @@ export function createUpstreamServer({
 
 		connect,
 
-		async waitForReady(timeoutMs = DEFAULT_CONNECTION_TIMEOUT_MS) {
+		async waitForReady(timeoutMs = connectionTimeout) {
 			if (this.isReady()) return Promise.resolve();
 
 			return firstValueFrom(

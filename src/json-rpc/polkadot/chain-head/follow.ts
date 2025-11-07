@@ -14,7 +14,8 @@ import { observeFollow } from "./metrics/follow.metrics";
 import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
-const MAX_FOLLOWS_PER_UPSTREAM = 4;
+const DEFAULT_MAX_FOLLOWS_PER_UPSTREAM = 2;
+const DEFAULT_MAX_WAITERS = 5;
 
 const logger = getLogger("wsmux.chainhead.follow");
 
@@ -22,7 +23,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 	const methodKey = "chainHead_v1_follow";
 
 	const getOrCreateFollow = createConcurrentCreator({
-		maxWaiting: 5,
+		maxWaiting: DEFAULT_MAX_WAITERS,
 		label: methodKey,
 	});
 
@@ -36,9 +37,13 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 
 			logger.debug((l) => l`[${upstreamId}] Follow request from ${clientId}`);
 
+			const maxSubscribers =
+				upstream.config.methods?.chainHead_v1_follow?.max_subscribers ??
+				DEFAULT_MAX_FOLLOWS_PER_UPSTREAM;
+
 			const chainHeadSubs: SharedSubscriptionPool =
 				upstream.subscriptions.getOrCreate(methodKey, {
-					maxSubscribers: MAX_FOLLOWS_PER_UPSTREAM,
+					maxSubscribers,
 				});
 
 			async function assignToDownstream(
@@ -105,7 +110,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 
 						logger.info(
 							(l) =>
-								l`[${upstreamId}:${followKey}] creating upstream follow (${followIndex + 1}/${MAX_FOLLOWS_PER_UPSTREAM})`,
+								l`[${upstreamId}:${followKey}] creating upstream follow (${followIndex + 1}/${maxSubscribers})`,
 						);
 
 						const response = await upstream.request({

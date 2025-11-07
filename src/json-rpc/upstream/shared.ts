@@ -8,7 +8,7 @@ import type { SharedSubscription } from "./types";
 const logger = getLogger(["wsmux", "upstream", "shared"]);
 
 export type SharedSubscriptionPoolOptions = {
-	maxSubscribers?: number;
+	maxSubscribers: number;
 	destroy?: () => void;
 };
 
@@ -25,7 +25,7 @@ export function createSharedSubscriptionGroup() {
 		ReturnType<typeof createSharedSubscriptionPool>
 	>();
 	return {
-		getOrCreate(key: string, opts: SharedSubscriptionPoolOptions = {}) {
+		getOrCreate(key: string, opts: SharedSubscriptionPoolOptions) {
 			if (!groups.has(key)) {
 				const destroy = () => {
 					groups.delete(key);
@@ -55,10 +55,7 @@ export function createSharedSubscriptionGroup() {
  */
 function createSharedSubscriptionPool(
 	key: string,
-	{
-		maxSubscribers: maxSubscriptions = 10,
-		destroy,
-	}: SharedSubscriptionPoolOptions,
+	{ maxSubscribers, destroy }: Required<SharedSubscriptionPoolOptions>,
 ) {
 	const subscriptions = new Map<string, SharedSubscription>();
 	const localIdIndex = new Map<string, SharedSubscription>();
@@ -82,7 +79,7 @@ function createSharedSubscriptionPool(
 		shouldCreateMore(selected?: [string, SharedSubscription]) {
 			return (
 				(!selected || selected[1].subscribersCount() > 0) &&
-				subscriptions.size < maxSubscriptions
+				subscriptions.size < maxSubscribers
 			);
 		},
 

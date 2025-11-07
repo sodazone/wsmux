@@ -1,26 +1,45 @@
-// DRAFT: to be defined properly
-// ---
+import type { UpstreamServerConfig } from "../json-rpc/upstream";
+
+export type DurationString = `${number}ms` | `${number}s` | `${number}m`;
+
+type UpstreamMethodLimits = {
+	max_connections?: number;
+};
 
 export type UpstreamConfig = {
 	name: string;
 	url: string;
-	maxConnections?: number;
-	reconnect?: {
-		maxRetries?: number;
-		backoffMs?: number;
-	};
+
+	request_timeout?: DurationString;
+	connection_timeout?: DurationString;
+	retry_delay?: DurationString;
+
+	max_connections?: number;
+	supported_methods?: "*" | string[];
+	methods?: Record<string, UpstreamMethodLimits>;
 };
 
-// TODO: maybe per method configurations
-// under polkadot rpc key?
-export type SubscriptionOptions = {
+type SubscriptionOptions = {
 	maxSubscribers?: number;
 };
 
-export type ProxyConfig = {
-	maxOpenSockets?: number;
-	logLevel?: "trace" | "debug" | "info" | "warn" | "error";
+type JsonRpcLimits = {
+	max_pending_requests_per_connection?: number;
+	max_pending_requests?: number;
+	max_requests_per_second?: number;
+};
 
+export type ProxyConfig = {
+	log_level?: "trace" | "debug" | "info" | "warn" | "error";
+	maxOpenSockets?: number;
 	upstream: UpstreamConfig[];
+	json_rpc?: JsonRpcLimits;
 	subscription?: SubscriptionOptions;
+};
+
+export type NormalizedConfig = {
+	logLevel: ProxyConfig["log_level"];
+	maxOpenSockets: number | undefined;
+	jsonRpc: ProxyConfig["json_rpc"];
+	upstream: UpstreamServerConfig[];
 };
