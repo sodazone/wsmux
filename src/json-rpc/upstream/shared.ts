@@ -267,8 +267,22 @@ function _createSharedSubscription(
 
 		unsubscribeLocal(localId: string) {
 			const sub = localSubs.get(localId);
-			if (sub) sub.subscription.unsubscribe();
+
+			if (sub) {
+				try {
+					sub.subscription.unsubscribe();
+				} catch {
+					// ignore
+				}
+			}
+
 			localSubs.delete(localId);
+
+			for (const [id, entry] of localSubs) {
+				if (entry.downstream.closed) {
+					localSubs.delete(id);
+				}
+			}
 
 			if (!aborted && localSubs.size === 0) {
 				void doDestroy();
