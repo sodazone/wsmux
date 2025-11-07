@@ -204,7 +204,7 @@ function _createSharedSubscription(
 		if (destroyed) return;
 		destroyed = true;
 		await destroy();
-		logger.info`[${upstreamSubId}] destroyed shared subscription pool`;
+		logger.info`[${upstreamSubId}] destroyed shared subscription`;
 	};
 
 	const abort = () => {
