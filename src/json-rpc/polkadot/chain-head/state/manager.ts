@@ -50,7 +50,7 @@ export function createStateManager() {
 			return [];
 		}
 
-		return [
+		const base = [
 			{
 				...snapshot.initialized,
 				params: {
@@ -63,6 +63,19 @@ export function createStateManager() {
 				params: { ...ev.params, subscription: upstreamSubId },
 			})),
 		];
+
+		const filtered = base.filter((ev) => {
+			const result = ev.params?.result;
+			if (!result) return false;
+			if (result.event === "initialized") return true;
+
+			const parent = result.parentBlockHash ?? result.parent?.blockHash;
+			if (!parent) return true;
+
+			return tracker.known.has(parent);
+		});
+
+		return filtered;
 	}
 
 	function update(msg: JSONRPCNotification) {
@@ -89,9 +102,35 @@ export function createStateManager() {
 				break;
 			}
 			case "finalized": {
-				const hash = result.finalizedBlockHashes.at(-1);
+				const hash = result.finalizedBlockHashes?.at(-1);
 				if (!hash) return;
 				snapshot.finalized = hash;
+
+				const pruned = result.prunedBlockHashes ?? [];
+				if (pruned.length > 0) {
+					for (const h of pruned) {
+						try {
+							tracker.forget(h);
+							logger.debug((l) => l`Forgot pruned hash ${h}`);
+						} catch (err) {
+							logger.warn("tracker.forget failed for {hash}: {err}", {
+								hash: h,
+								err,
+							});
+						}
+					}
+
+					for (let i = snapshot.events.length - 1; i >= 0; i--) {
+						const ev = snapshot.events[i];
+						if (ev) {
+							const evHash = ev.params?.result?.blockHash;
+							const evParent = ev.params?.result?.parentBlockHash;
+							if (pruned.includes(evHash) || pruned.includes(evParent)) {
+								snapshot.events.splice(i, 1);
+							}
+						}
+					}
+				}
 
 				if (snapshot.initialized) {
 					snapshot.initialized.params.result.finalizedBlockHashes = [
@@ -99,6 +138,7 @@ export function createStateManager() {
 					];
 				}
 
+				// Remove already-applied events up to finalized hash
 				const idx = snapshot.events.findIndex(
 					(e) => e.params.result.blockHash === hash,
 				);

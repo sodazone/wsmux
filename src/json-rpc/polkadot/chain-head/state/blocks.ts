@@ -11,6 +11,19 @@ export function createBlockTracker(
 	const known = new Set<string>();
 	const pending: JSONRPCNotification[] = [];
 
+	function forget(hash: string) {
+		known.delete(hash);
+
+		for (let i = pending.length - 1; i >= 0; i--) {
+			const p = pending[i];
+			const h = p?.params?.result?.blockHash;
+			const parent = p?.params?.result?.parentBlockHash;
+			if (h === hash || parent === hash) {
+				pending.splice(i, 1);
+			}
+		}
+	}
+
 	function remember(hash?: string) {
 		if (!hash) {
 			return;
@@ -76,6 +89,7 @@ export function createBlockTracker(
 
 	return {
 		remember,
+		forget,
 		handleNewBlock,
 		flushPending,
 		known,
