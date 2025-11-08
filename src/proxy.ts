@@ -7,9 +7,9 @@ import type { JSONRPCContextData } from "./json-rpc";
 import { createJsonRpcMiddleware, createUpstreamRegistry } from "./json-rpc";
 import { polkadotMethods } from "./json-rpc/polkadot";
 import { initLogger } from "./logger";
-import { metricsMiddleware } from "./metrics";
 import { startJscMetrics } from "./runtime/metrics";
 import { createWebSocketHandler } from "./ws";
+import { metricsMiddleware } from "./ws/metrics";
 
 async function run(
 	options: Bun.Serve.HostnamePortServeOptions<JSONRPCContextData> = {},

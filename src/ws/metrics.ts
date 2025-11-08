@@ -1,6 +1,6 @@
 import { Counter, Gauge, Histogram } from "prom-client";
 
-import type { WebSocketMiddleware } from "./ws";
+import type { WebSocketMiddleware } from ".";
 
 export const wsMetrics = {
 	activeConnections: new Gauge({
