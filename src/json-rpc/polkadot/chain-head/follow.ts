@@ -95,10 +95,12 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 						if (followLimitReached.has(upstreamId)) {
 							if (selected) return selected;
 
-							followLimitReached.delete(upstreamId);
-							throw new RateLimitedError(
-								"Upstream follow limit reached (reset)",
+							logger.debug(
+								(l) =>
+									l`[${upstreamId}] resetting follow-limit flag (no reusable subscription)`,
 							);
+
+							followLimitReached.delete(upstreamId);
 						}
 
 						if (selected && !chainHeadSubs.shouldCreateMore(selected)) {
@@ -119,29 +121,12 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 						});
 
 						if ("error" in response) {
-							const { code, message } = response.error as {
-								code: number;
-								message: string;
-							};
+							const { code, message } = response.error;
 
 							if (code === -32800) {
 								followLimitReached.add(upstreamId);
 
-								logger.warn(
-									(l) =>
-										l`[${upstreamId}:${followKey}] upstream follow limit reached (${code}: ${message})`,
-								);
-
-								if (selected) {
-									logger.info(
-										(l) =>
-											l`[${upstreamId}:${followKey}] reusing selected follow ${selected[0]} after limit error`,
-									);
-
-									return selected;
-								}
-
-								followLimitReached.delete(upstreamId);
+								if (selected) return selected;
 
 								throw new RateLimitedError(
 									message ?? "Upstream follow limit reached",
