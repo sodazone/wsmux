@@ -166,7 +166,26 @@ function createSharedSubscriptionPool(
 			source$: Observable<JSONRPCNotification>,
 			destroy: () => Promise<void> | void,
 		): SharedSubscription {
-			const shared = _createSharedSubscription(upstreamSubId, source$, destroy);
+			const shared = _createSharedSubscription(
+				upstreamSubId,
+				source$,
+				async () => {
+					try {
+						await destroy();
+					} catch (error) {
+						logger.error("Error destroying shared subscription: {error}", {
+							error,
+						});
+					}
+					try {
+						this.release(key);
+					} catch (error) {
+						logger.error("Error releasing shared subscription: {error}", {
+							error,
+						});
+					}
+				},
+			);
 			this.acquire(key, shared);
 			return shared;
 		},
@@ -207,6 +226,9 @@ function _createSharedSubscription(
 	const abort = () => {
 		aborted = true;
 		logger.warn`[${upstreamSubId}] Shared subscription aborted (upstream disconnect)`;
+		if (localSubs.size === 0) {
+			void doDestroy();
+		}
 	};
 
 	return {
@@ -281,7 +303,7 @@ function _createSharedSubscription(
 				}
 			}
 
-			if (!aborted && localSubs.size === 0) {
+			if (localSubs.size === 0) {
 				void doDestroy();
 			}
 		},
