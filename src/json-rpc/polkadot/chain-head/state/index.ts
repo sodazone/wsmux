@@ -30,15 +30,15 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 			const stateManager = stateManagers.get(followKey)!;
 
 			let cleaned = false;
-			const cleanup = async (unfollow = true) => {
+			const cleanup = async (aborted = false) => {
 				if (cleaned) return;
 				cleaned = true;
 
 				logger.info(
 					(l) =>
-						l`[${upstreamSubId}] ${unfollow ? "unfollow" : "clean up"} upstream`,
+						l`[${upstreamSubId}] ${aborted ? "clean up" : "unfollow"} upstream`,
 				);
-				if (unfollow) {
+				if (!aborted) {
 					await upstream.request({
 						jsonrpc: "2.0",
 						method: "chainHead_v1_unfollow",
@@ -58,7 +58,7 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 					stateManager.withUpdater(upstreamSubId, upstream, () => {
 						// we send up the unfollow, seemingly some RPCs expect that
 						// after stopping
-						void cleanup(true);
+						void cleanup(false);
 						logger.info`cleanup ${followKey} from pool`;
 					}),
 					cleanup,

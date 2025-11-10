@@ -164,14 +164,14 @@ function createSharedSubscriptionPool(
 			key: string,
 			upstreamSubId: string,
 			source$: Observable<JSONRPCNotification>,
-			destroy: () => Promise<void> | void,
+			destroy: (aborted: boolean) => Promise<void> | void,
 		): SharedSubscription {
 			const shared = _createSharedSubscription(
 				upstreamSubId,
 				source$,
-				async () => {
+				async (aborted: boolean) => {
 					try {
-						await destroy();
+						await destroy(aborted);
 					} catch (error) {
 						logger.error("Error destroying shared subscription: {error}", {
 							error,
@@ -195,6 +195,7 @@ function createSharedSubscriptionPool(
 				sub.abort();
 			});
 			subscriptions.clear();
+			leastLoaded = undefined;
 		},
 	};
 }
@@ -202,7 +203,7 @@ function createSharedSubscriptionPool(
 function _createSharedSubscription(
 	upstreamSubId: string,
 	source$: Observable<JSONRPCNotification>,
-	destroy: () => Promise<void> | void,
+	destroy: (aborder: boolean) => Promise<void> | void,
 ): SharedSubscription {
 	let aborted = false;
 	let destroyed = false;
@@ -216,19 +217,40 @@ function _createSharedSubscription(
 		}
 	>();
 
-	const doDestroy = async () => {
+	const doDestroy = async (aborted: boolean) => {
 		if (destroyed) return;
 		destroyed = true;
-		await destroy();
+		await destroy(aborted);
 		logger.info`[${upstreamSubId}] destroyed shared subscription`;
 	};
 
 	const abort = () => {
+		if (aborted || destroyed) {
+			return;
+		}
+
 		aborted = true;
 		logger.warn`[${upstreamSubId}] Shared subscription aborted (upstream disconnect)`;
-		if (localSubs.size === 0) {
-			void doDestroy();
+
+		for (const localId of Array.from(localSubs.keys())) {
+			const entry = localSubs.get(localId);
+
+			try {
+				entry?.subscription.unsubscribe();
+			} catch {
+				//
+			}
+
+			localSubs.delete(localId);
+
+			try {
+				entry?.downstream.close(1013, "upstream disconnected");
+			} catch {
+				//
+			}
 		}
+
+		void doDestroy(aborted);
 	};
 
 	return {
@@ -304,7 +326,7 @@ function _createSharedSubscription(
 			}
 
 			if (localSubs.size === 0) {
-				void doDestroy();
+				void doDestroy(aborted);
 			}
 		},
 
