@@ -4,7 +4,6 @@ import { parseArgs } from "node:util";
 
 const DEFAULTS = {
 	config: process.env.WSMUX_CONFIG ?? "./wsmux.config.yaml",
-	verbosity: parseInt(process.env.WSMUX_VERBOSE || "0", 10),
 	listen: process.env.WSMUX_LISTEN || ":8181",
 };
 
@@ -49,7 +48,6 @@ export function getOpts() {
 		options: {
 			help: { type: "boolean", short: "h" },
 			config: { type: "string", short: "c" },
-			verbose: { type: "boolean", short: "v", multiple: true },
 			listen: { type: "string", short: "l" },
 		},
 		strict: true,
@@ -63,13 +61,11 @@ Usage: wsmux [options]
 Options:
   -c, --config <path>   Configuration file
   -l, --listen <addr>   Listening address (host:port, :port, [::]:port)
-  -v                    Increase verbosity (repeatable)
   -h, --help            Show this help message
 
 Environment variables:
   WSMUX_CONFIG          Path to config file
   WSMUX_LISTEN          Default listen address
-  WSMUX_VERBOSE         Verbosity (0-3)
 `);
 		process.exit(0);
 	}
@@ -77,7 +73,6 @@ Environment variables:
 	return {
 		config: values.config ?? DEFAULTS.config,
 		listen: parseTcpListen(values.listen ? values.listen : DEFAULTS.listen),
-		verbosity: values.verbose ? values.verbose.length : DEFAULTS.verbosity,
 		positionals,
 	};
 }
