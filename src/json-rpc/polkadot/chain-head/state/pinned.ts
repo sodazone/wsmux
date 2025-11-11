@@ -2,7 +2,7 @@ import { getLogger } from "@logtape/logtape";
 
 import type { UpstreamServer } from "../../../upstream";
 
-const logger = getLogger(["wsmux", "chainhead", "unpin"]);
+const logger = getLogger(["wsmux", "chainhead", "state.pinned"]);
 
 const MAX_HASHES_PER_UPSTREAM = 512;
 

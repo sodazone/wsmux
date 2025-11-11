@@ -54,19 +54,13 @@ export function getConfig(): NormalizedConfig {
 	return CONFIG;
 }
 
-function setConfig(c: NormalizedConfig) {
-	CONFIG = c;
-}
-
 export async function loadConfig(path = "./wsmux.config.yaml") {
 	try {
 		// TODO: user friendly message and usage when config is not found or invalid
 		const text = await Bun.file(path).text();
 		const raw = YAML.parse(text) as ProxyConfig;
-		const normalized = normalizeConfig(raw);
-
-		setConfig(normalized);
-		return normalized;
+		CONFIG = normalizeConfig(raw);
+		return CONFIG;
 	} catch (err) {
 		throw new Error(`Unable to load config: "${path}"`, { cause: err });
 	}

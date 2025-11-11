@@ -2,7 +2,7 @@ import { getLogger } from "@logtape/logtape";
 
 import type { JSONRPCMethodHandler } from "../../methods";
 
-const logger = getLogger("wsmux.chainhead.unfollow");
+const logger = getLogger(["wsmux", "chainhead", "unfollow"]);
 
 export const chainHead_v1_unfollow: JSONRPCMethodHandler = {
 	async handleRequest(upstream, downstream, req) {

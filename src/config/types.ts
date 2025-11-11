@@ -1,3 +1,4 @@
+import type { LogLevel } from "@logtape/logtape";
 import type { UpstreamServerConfig } from "../json-rpc/upstream";
 
 export type DurationString = `${number}ms` | `${number}s` | `${number}m`;
@@ -30,7 +31,7 @@ type JsonRpcLimits = {
 };
 
 export type ProxyConfig = {
-	log_level?: "trace" | "debug" | "info" | "warn" | "error";
+	log_level?: LogLevel;
 	maxOpenSockets?: number;
 	upstream: UpstreamConfig[];
 	json_rpc?: JsonRpcLimits;

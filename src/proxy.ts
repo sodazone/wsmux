@@ -15,7 +15,7 @@ async function run(
 	options: Bun.Serve.HostnamePortServeOptions<JSONRPCContextData> = {},
 ) {
 	const config = await loadConfig();
-	await initLogger();
+	await initLogger(config.logLevel);
 
 	const logger = getLogger("wsmux");
 

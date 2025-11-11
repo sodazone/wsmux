@@ -17,7 +17,7 @@ import { followNotifyTransform } from "./transform";
 const DEFAULT_MAX_FOLLOWS_PER_UPSTREAM = 2;
 const DEFAULT_MAX_WAITERS = 5;
 
-const logger = getLogger("wsmux.chainhead.follow");
+const logger = getLogger(["wsmux", "chainhead", "follow"]);
 
 export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 	const methodKey = "chainHead_v1_follow";

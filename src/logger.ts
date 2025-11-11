@@ -1,15 +1,10 @@
-import { configure, getConsoleSink } from "@logtape/logtape";
+import { configure, getConsoleSink, type LogLevel } from "@logtape/logtape";
 
-export async function initLogger() {
+export async function initLogger(lowestLevel?: LogLevel) {
 	await configure({
 		sinks: { console: getConsoleSink() },
 		loggers: [
-			{
-				category: "wsmux.chainhead.follow",
-				lowestLevel: "info",
-				sinks: ["console"],
-			},
-			{ category: "wsmux", lowestLevel: "info", sinks: ["console"] },
+			{ category: "wsmux", lowestLevel, sinks: ["console"] },
 			{
 				category: ["logtape", "meta"],
 				lowestLevel: "warning",
