@@ -77,7 +77,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					followNotifyTransform(request),
 				);
 
-				upstream.unsubscribers.set(localId, () => {
+				upstream.setUnsubscriber(localId, () => {
 					pinnedBlocks.unsubscribeLocal(upstream, localId);
 					shared.unsubscribeLocal(localId);
 

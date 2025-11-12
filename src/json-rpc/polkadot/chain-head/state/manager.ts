@@ -277,5 +277,12 @@ export function createStateManager() {
 	return {
 		snapshot,
 		withUpdater,
+		stats: () => {
+			return {
+				snapshot: {
+					events: snapshot.events.length,
+				},
+			};
+		},
 	};
 }

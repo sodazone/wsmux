@@ -9,6 +9,7 @@ import type {
 	JSONRPCResponse,
 } from "../types";
 import { createSharedSubscriptionGroup } from "./shared";
+import { collectStats } from "./stats";
 import type { UpstreamServer, UpstreamServerConfig } from "./types";
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
@@ -26,6 +27,7 @@ export function createUpstreamServer({
 	url,
 	supportedMethods,
 	methods,
+	stats,
 	requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS,
 	connectionTimeout = DEFAULT_CONNECTION_TIMEOUT_MS,
 	maxConnections = DEFAULT_MAX_CONNECTIONS,
@@ -100,7 +102,6 @@ export function createUpstreamServer({
 		},
 		supportedMethods,
 		subscriptions,
-		unsubscribers,
 		message$,
 
 		isReady: () => {
@@ -180,10 +181,17 @@ export function createUpstreamServer({
 		},
 
 		unsubscribe(localId: string) {
-			logger.info(`[${localId}] unsubscribing`);
+			logger.info(`[${localId}] unsubscribing (${unsubscribers.size})`);
 
-			const unsub = unsubscribers.get(localId);
-			if (unsub) unsub();
+			try {
+				const unsub = unsubscribers.get(localId);
+				if (unsub) unsub();
+			} catch (error) {
+				logger.error(`[${localId}] error calling unsubscribe: {error}`, {
+					error,
+				});
+			}
+
 			unsubscribers.delete(localId);
 		},
 
@@ -215,6 +223,26 @@ export function createUpstreamServer({
 			}
 			return states.get(id)! as T;
 		},
+
+		setUnsubscriber(localId: string, unsub: () => void) {
+			logger.info(`[${localId}] add unsubscriber (${unsubscribers.size})`);
+			unsubscribers.set(localId, unsub);
+		},
+
+		removeUnsubscriber(localId: string) {
+			logger.info(`[${localId}] remove unsubscriber (${unsubscribers.size})`);
+			unsubscribers.delete(localId);
+		},
+
+		stats() {
+			return {
+				states: collectStats(states),
+				unsubscribers: unsubscribers.size,
+				messageSubscribers: (message$ as any).observers?.length ?? 0,
+				connections: _connections,
+				subscriptions: subscriptions.stats(),
+			};
+		},
 	};
 
 	function handleMessage(data: string) {
@@ -224,6 +252,23 @@ export function createUpstreamServer({
 		} catch (err) {
 			logger.error("[{url}] JSON parse error", { url, err });
 		}
+	}
+
+	if (stats?.enabled) {
+		// HINT: consider controlling this output with logtape to output to file (if needed)
+		logger.warn(
+			`[${url}] stats enabled, print every ${stats.interval}ms (not intended for production)`,
+		);
+
+		setInterval(() => {
+			const s = server.stats();
+			console.log(
+				"---------------------------------------------\n",
+				`[${new Date().toISOString()}] ${url} STATS\n`,
+				JSON.stringify(s, null, 2),
+				"\n---------------------------------------------",
+			);
+		}, stats.interval).unref();
 	}
 
 	return server;

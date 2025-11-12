@@ -33,7 +33,8 @@ export type UpstreamServer = {
 	url: string;
 	nextId: number;
 	subscriptions: SharedSubscriptionGroup;
-	unsubscribers: Map<string, () => void>;
+	setUnsubscriber(localId: string, unsub: () => void): void;
+	removeUnsubscriber(localId: string): void;
 	unsubscribe: (localId: string) => void;
 	message$: Observable<JSONRPCResponse | JSONRPCNotification>;
 	supportedMethods?: string[];
@@ -52,6 +53,13 @@ export type UpstreamServer = {
 	connect(): Promise<void>;
 	stop(): void;
 	getOrCreateState<T>(id: string, factory: () => T): T;
+	stats(): {
+		states: Record<string, any>;
+		subscriptions: Record<string, any>;
+		unsubscribers: number;
+		messageSubscribers: number;
+		connections: number;
+	};
 };
 
 export type UpstreamServerConfig = {
@@ -63,6 +71,10 @@ export type UpstreamServerConfig = {
 	supportedMethods?: string[];
 	retryDelay?: number;
 	methods?: Record<string, any>;
+	stats?: {
+		enabled: boolean;
+		interval: number;
+	};
 };
 
 export type UpstreamRegistry = {

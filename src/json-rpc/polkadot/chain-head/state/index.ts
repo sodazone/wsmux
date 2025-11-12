@@ -62,8 +62,18 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 						logger.info`cleanup ${followKey} from pool`;
 					}),
 					cleanup,
+					(localId: string) => {
+						upstream.removeUnsubscriber(localId);
+					},
 				),
 			);
+		},
+		stats: () => {
+			const stats: Record<string, any> = {};
+			for (const [key, manager] of stateManagers) {
+				stats[key] = manager.stats();
+			}
+			return stats;
 		},
 	};
 }

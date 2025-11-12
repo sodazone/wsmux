@@ -40,6 +40,32 @@ export function createSharedSubscriptionGroup() {
 		get(key: string) {
 			return groups.get(key);
 		},
+		stats() {
+			const stats: any = {};
+
+			for (const [poolKey, pool] of groups.entries()) {
+				const poolStats: any = {
+					subscriptionCount: pool.size(),
+					localIds: pool.localIdsSize(),
+					subscriptions: {},
+				};
+
+				for (const [subKey, shared] of pool.__subscriptions.entries()) {
+					const localSubs = shared.getLocalIds().length;
+
+					poolStats.subscriptions[subKey] = {
+						localSubscribers: localSubs,
+						aborted: (shared as any).aborted ?? false,
+						destroyed: (shared as any).destroyed ?? false,
+					};
+				}
+
+				stats[poolKey] = poolStats;
+			}
+
+			return stats;
+		},
+
 		abort() {
 			groups.forEach((pool) => {
 				pool.abort();
@@ -74,6 +100,10 @@ function createSharedSubscriptionPool(
 
 		size() {
 			return subscriptions.size;
+		},
+
+		localIdsSize() {
+			return localIdIndex.size;
 		},
 
 		shouldCreateMore(selected?: [string, SharedSubscription]) {
@@ -155,6 +185,7 @@ function createSharedSubscriptionPool(
 		 * - `upstreamSubId` is the identifier of the upstream subscription.
 		 * - `source$` is the shared upstream observable stream.
 		 * - `destroy` is a cleanup callback invoked once the upstream is no longer needed.
+		 * - `onLocalUnsubscribe` is a callback invoked when a local subscription is unsubscribed.
 		 *
 		 * Local vs. upstream subscriptions:
 		 * - **Upstream subscription**: Only one exists per `upstreamSubId`, shared among all downstreams.
@@ -165,6 +196,7 @@ function createSharedSubscriptionPool(
 			upstreamSubId: string,
 			source$: Observable<JSONRPCNotification>,
 			destroy: (aborted: boolean) => Promise<void> | void,
+			onLocalUnsubscribe: (localId: string) => void,
 		): SharedSubscription {
 			const shared = _createSharedSubscription(
 				upstreamSubId,
@@ -185,6 +217,7 @@ function createSharedSubscriptionPool(
 						});
 					}
 				},
+				onLocalUnsubscribe,
 			);
 			this.acquire(key, shared);
 			return shared;
@@ -197,6 +230,8 @@ function createSharedSubscriptionPool(
 			subscriptions.clear();
 			leastLoaded = undefined;
 		},
+
+		__subscriptions: subscriptions,
 	};
 }
 
@@ -204,6 +239,7 @@ function _createSharedSubscription(
 	upstreamSubId: string,
 	source$: Observable<JSONRPCNotification>,
 	destroy: (aborder: boolean) => Promise<void> | void,
+	onLocalUnsubscribe: (localId: string) => void,
 ): SharedSubscription {
 	let aborted = false;
 	let destroyed = false;
@@ -323,6 +359,12 @@ function _createSharedSubscription(
 				if (entry.downstream.closed) {
 					localSubs.delete(id);
 				}
+			}
+
+			try {
+				onLocalUnsubscribe(localId);
+			} catch {
+				//
 			}
 
 			if (localSubs.size === 0) {
