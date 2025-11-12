@@ -263,7 +263,6 @@ export function createUpstreamServer({
 		setInterval(() => {
 			const s = server.stats();
 			console.log(
-				"---------------------------------------------\n",
 				`[${new Date().toISOString()}] ${url} STATS\n`,
 				JSON.stringify(s, null, 2),
 				"\n---------------------------------------------",
