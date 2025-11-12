@@ -154,8 +154,11 @@ export function createWebSocketHandler<Data = unknown>(
 		},
 
 		async close(ws, code, reason) {
-			await stacks.close({ ws, code, reason });
-			activeSockets.delete(ws);
+			try {
+				await stacks.close({ ws, code, reason });
+			} finally {
+				activeSockets.delete(ws);
+			}
 		},
 
 		async drain(ws) {
