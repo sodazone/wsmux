@@ -1,3 +1,9 @@
+import { getLogger } from "@logtape/logtape";
+
+import type { UpstreamServer } from "./types";
+
+const logger = getLogger(["wsmux", "upstream", "stats"]);
+
 function isCollectable(
 	value: any,
 ): value is { stats: () => Record<string, any> } {
@@ -24,4 +30,20 @@ export function collectStats(states: Map<string, any>) {
 	}
 
 	return result;
+}
+
+export function startServerStats(
+	servers: UpstreamServer[],
+	{ interval }: { interval: number },
+) {
+	for (const server of servers) {
+		logger.warn(
+			`[${server.url}] stats enabled, print every ${interval}ms (not intended for production)`,
+		);
+
+		setInterval(() => {
+			const s = server.stats();
+			logger.info`${server.url} stats:\n${Bun.inspect(s, { compact: true })}`;
+		}, interval).unref();
+	}
 }

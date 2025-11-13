@@ -6,15 +6,11 @@ import {
 } from "./chain-head/forward";
 import { chainHead_v1_unfollow } from "./chain-head/unfollow";
 import { chainHead_v1_unpin } from "./chain-head/unpin";
+import { forwardRequest } from "./forward";
 
 export function polkadotMethods() {
 	return {
-		rpc_methods: {
-			handleRequest: async (upstream, downstream, req) => {
-				const response = await upstream.request(req);
-				downstream.send(response);
-			},
-		},
+		__fallback: forwardRequest,
 		chainHead_v1_follow: chainHead_v1_follow(),
 		chainHead_v1_unfollow: chainHead_v1_unfollow,
 		chainHead_v1_unpin: chainHead_v1_unpin,

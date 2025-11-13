@@ -7,7 +7,7 @@ type UpstreamMethodLimits = {
 	max_connections?: number;
 };
 
-export type UpstreamConfig = {
+export type RawUpstreamServerConfig = {
 	name: string;
 	url: string;
 
@@ -33,26 +33,34 @@ type JsonRpcLimits = {
 export type ProxyConfig = {
 	log_level?: LogLevel;
 	maxOpenSockets?: number;
-	debug?: {
-		stats?: {
-			enabled: boolean;
-			interval?: DurationString;
+	upstream: {
+		debug?: {
+			stats?: {
+				enabled: boolean;
+				interval?: DurationString;
+			};
 		};
+		servers: RawUpstreamServerConfig[];
+		stateless: string[];
 	};
-	upstream: UpstreamConfig[];
 	json_rpc?: JsonRpcLimits;
 	subscription?: SubscriptionOptions;
 };
 
-export type NormalizedConfig = {
-	logLevel: ProxyConfig["log_level"];
+export type UpstreamConfig = {
 	debug: {
 		stats: {
 			enabled: boolean;
 			interval: number;
 		};
 	};
+	servers: UpstreamServerConfig[];
+	stateless: Set<string>;
+};
+
+export type NormalizedConfig = {
+	logLevel: ProxyConfig["log_level"];
 	maxOpenSockets: number | undefined;
 	jsonRpc: ProxyConfig["json_rpc"];
-	upstream: UpstreamServerConfig[];
+	upstream: UpstreamConfig;
 };

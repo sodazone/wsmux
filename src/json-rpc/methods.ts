@@ -16,7 +16,7 @@ export async function handleRPCMethod(
 	req: JSONRPCRequest,
 	handlers: Record<string, JSONRPCMethodHandler>,
 ): Promise<void> {
-	const handler = handlers[req.method];
+	const handler = handlers[req.method] ?? handlers.__fallback;
 	if (!handler) return;
 
 	await handler.handleRequest(upstream, downstream, req);

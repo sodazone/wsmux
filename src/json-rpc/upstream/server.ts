@@ -27,7 +27,6 @@ export function createUpstreamServer({
 	url,
 	supportedMethods,
 	methods,
-	stats,
 	requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS,
 	connectionTimeout = DEFAULT_CONNECTION_TIMEOUT_MS,
 	maxConnections = DEFAULT_MAX_CONNECTIONS,
@@ -252,22 +251,6 @@ export function createUpstreamServer({
 		} catch (err) {
 			logger.error("[{url}] JSON parse error", { url, err });
 		}
-	}
-
-	if (stats?.enabled) {
-		// HINT: consider controlling this output with logtape to output to file (if needed)
-		logger.warn(
-			`[${url}] stats enabled, print every ${stats.interval}ms (not intended for production)`,
-		);
-
-		setInterval(() => {
-			const s = server.stats();
-			console.log(
-				`[${new Date().toISOString()}] ${url} STATS\n`,
-				JSON.stringify(s, null, 2),
-				"\n---------------------------------------------",
-			);
-		}, stats.interval).unref();
 	}
 
 	return server;

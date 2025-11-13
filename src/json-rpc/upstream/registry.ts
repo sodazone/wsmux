@@ -1,19 +1,41 @@
+import type { UpstreamConfig } from "../../config";
 import type { JSONRPCContextData } from "../types";
 import { createUpstreamServer } from "./server";
-import type {
-	UpstreamRegistry,
-	UpstreamServer,
-	UpstreamServerConfig,
-} from "./types";
+import { startServerStats } from "./stats";
+import type { UpstreamRegistry, UpstreamServer } from "./types";
 
 export function createUpstreamRegistry(
-	configs: UpstreamServerConfig[],
+	config: UpstreamConfig,
 ): UpstreamRegistry {
-	const servers = configs.map(createUpstreamServer);
+	const servers = config.servers.map(createUpstreamServer);
+	const statelessMethods = config.stateless;
 	const clientUpstream = new Map<number, UpstreamServer>();
 	let lastIndex = -1;
 
+	if (config.debug.stats.enabled) {
+		startServerStats(servers, config.debug.stats);
+	}
+
+	const pickServer = (method: string): UpstreamServer | undefined => {
+		const candidates = servers.filter(
+			(s) =>
+				s.isReady() &&
+				s.hasCapacity() &&
+				(s.supportedMethods === undefined ||
+					s.supportedMethods.includes(method)),
+		);
+		if (candidates.length === 0) return undefined;
+		lastIndex = (lastIndex + 1) % candidates.length;
+		return candidates[lastIndex];
+	};
+
 	const resolveUpstream = (ctx: JSONRPCContextData, method: string) => {
+		// stateless
+		if (statelessMethods.has(method)) {
+			return pickServer(method);
+		}
+
+		// stateful
 		const client = ctx.client;
 		if (client === undefined) {
 			return undefined;
@@ -32,17 +54,8 @@ export function createUpstreamRegistry(
 			server.connections.dec();
 		}
 
-		const candidates = servers.filter(
-			(s) =>
-				s.isReady() &&
-				s.hasCapacity() &&
-				(s.supportedMethods === undefined ||
-					s.supportedMethods.includes(method)),
-		);
-		if (candidates.length === 0) return undefined;
-
-		lastIndex = (lastIndex + 1) % candidates.length;
-		const server = candidates[lastIndex]!;
+		const server = pickServer(method);
+		if (server === undefined) return undefined;
 
 		clientUpstream.set(clientId, server);
 		server.connections.inc();

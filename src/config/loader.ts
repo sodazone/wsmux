@@ -4,7 +4,7 @@ import type {
 	DurationString,
 	NormalizedConfig,
 	ProxyConfig,
-	UpstreamConfig,
+	RawUpstreamServerConfig,
 } from "./types";
 
 function parseDuration(s?: DurationString): number | undefined {
@@ -17,45 +17,43 @@ function parseDuration(s?: DurationString): number | undefined {
 	throw new Error(`Invalid duration string: ${s}`);
 }
 
-function normalizeUpstreamWithDebug(debug: {
-	stats: { enabled: boolean; interval: number };
-}) {
-	return (u: UpstreamConfig): UpstreamServerConfig => {
-		return {
-			name: u.name,
-			url: u.url,
+function normalizeUpstreamServer(
+	u: RawUpstreamServerConfig,
+): UpstreamServerConfig {
+	return {
+		name: u.name,
+		url: u.url,
+		requestTimeout: parseDuration(u.request_timeout),
+		connectionTimeout: parseDuration(u.connection_timeout),
+		retryDelay: parseDuration(u.retry_delay),
+		maxConnections: u.max_connections,
 
-			requestTimeout: parseDuration(u.request_timeout),
-			connectionTimeout: parseDuration(u.connection_timeout),
-			retryDelay: parseDuration(u.retry_delay),
-			maxConnections: u.max_connections,
+		supportedMethods:
+			u.supported_methods === "*" || !u.supported_methods
+				? undefined
+				: [...u.supported_methods],
 
-			supportedMethods:
-				u.supported_methods === "*" || !u.supported_methods
-					? undefined
-					: [...u.supported_methods],
-
-			methods: u.methods ?? {},
-			stats: debug.stats,
-		};
+		methods: u.methods ?? {},
 	};
 }
 
 function normalizeConfig(raw: ProxyConfig): NormalizedConfig {
-	const debug = {
-		stats: {
-			enabled: raw.debug?.stats?.enabled ?? false,
-			interval: raw.debug?.stats?.interval
-				? (parseDuration(raw.debug?.stats.interval) ?? 20_000)
-				: 20_000,
-		},
-	};
 	return {
 		logLevel: raw.log_level ?? "info",
-		debug,
 		maxOpenSockets: raw.maxOpenSockets,
 		jsonRpc: raw.json_rpc,
-		upstream: raw.upstream.map(normalizeUpstreamWithDebug(debug)),
+		upstream: {
+			stateless: new Set(raw.upstream.stateless ?? []),
+			debug: {
+				stats: {
+					enabled: raw.upstream.debug?.stats?.enabled ?? false,
+					interval: raw.upstream.debug?.stats?.interval
+						? (parseDuration(raw.upstream.debug?.stats.interval) ?? 20_000)
+						: 20_000,
+				},
+			},
+			servers: raw.upstream.servers.map(normalizeUpstreamServer),
+		},
 	};
 }
 

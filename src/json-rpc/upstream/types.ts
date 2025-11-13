@@ -71,10 +71,6 @@ export type UpstreamServerConfig = {
 	supportedMethods?: string[];
 	retryDelay?: number;
 	methods?: Record<string, any>;
-	stats?: {
-		enabled: boolean;
-		interval: number;
-	};
 };
 
 export type UpstreamRegistry = {

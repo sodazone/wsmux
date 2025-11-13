@@ -1,26 +1,41 @@
 log_level: info
-debug:
-  stats:
-    enabled: false
-    interval: 30s
 upstream:
-  - name: chaos
-    url: ws://localhost:9944
-    request_timeout: 5s
-    connection_timeout: 10s
-    max_connections: 100
-    retry_delay: 1s
-  - name: stakeworld
-    url: wss://dot-rpc.stakeworld.io
-    methods:
-      chainHead_v1_follow:
-        max_subscribers: 4
-  - name: helix
-    url: wss://rpc-polkadot.helixstreet.io
-    supported_methods: "*"
-    methods:
-      chainHead_v1_follow:
-        max_subscribers: 4
+  debug:
+    stats:
+      enabled: false
+      interval: 30s
+  # A method is stateless if
+  # (1) its result does not depend on the node’s current chain tip or state, and
+  # (2) it can be served equivalently from any node, at any time, without breaking logical consistency.
+  stateless:
+    [
+      rpc_methods,
+      chainSpec_v1_chainName,
+      chainSpec_v1_genesisHash,
+      chainSpec_v1_properties,
+      system_name,
+      system_chainType,
+      system_version,
+      system_properties,
+    ]
+  servers:
+    - name: chaos
+      url: ws://localhost:9944
+      request_timeout: 5s
+      connection_timeout: 10s
+      max_connections: 100
+      retry_delay: 1s
+    - name: stakeworld
+      url: wss://dot-rpc.stakeworld.io
+      methods:
+        chainHead_v1_follow:
+          max_subscribers: 4
+    - name: helix
+      url: wss://rpc-polkadot.helixstreet.io
+      supported_methods: "*"
+      methods:
+        chainHead_v1_follow:
+          max_subscribers: 4
 json_rpc:
   max_pending_requests_per_connection: 50
   max_pending_requests: 500
