@@ -1,4 +1,17 @@
 log_level: info
+
+# Websocket connection per IP rate limit
+rate_limit:
+  enabled: false
+  window: 1m
+  max_requests: 100
+  # Trusted networks for forwarding/proxy headers
+  trusted_networks:
+    - 192.168.0.0/16
+    - 172.16.0.0/12
+    - 127.0.0.1/32
+
+# Upstream servers
 upstream:
   debug:
     stats:

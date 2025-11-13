@@ -31,6 +31,7 @@ export type JSONRPCNotification = {
 };
 
 export type JSONRPCContextData = {
+	headers?: Headers;
 	client?: DownstreamClient;
 };
 

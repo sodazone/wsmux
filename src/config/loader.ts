@@ -7,14 +7,24 @@ import type {
 	RawUpstreamServerConfig,
 } from "./types";
 
-function parseDuration(s?: DurationString): number | undefined {
-	if (!s) return undefined;
+function parseDuration(
+	s: DurationString | null | undefined,
+	defaultMs?: number,
+): number | undefined {
+	if (!s) return defaultMs;
 
 	if (s.endsWith("ms")) return Number(s.slice(0, -2));
 	if (s.endsWith("s")) return Number(s.slice(0, -1)) * 1000;
 	if (s.endsWith("m")) return Number(s.slice(0, -1)) * 60_000;
 
 	throw new Error(`Invalid duration string: ${s}`);
+}
+
+function parseDurationWithDefault(
+	s: DurationString | null | undefined,
+	defaultMs: number,
+): number {
+	return parseDuration(s, defaultMs) ?? defaultMs;
 }
 
 function normalizeUpstreamServer(
@@ -40,16 +50,22 @@ function normalizeUpstreamServer(
 function normalizeConfig(raw: ProxyConfig): NormalizedConfig {
 	return {
 		logLevel: raw.log_level ?? "info",
-		maxOpenSockets: raw.maxOpenSockets,
+		rateLimit: {
+			enabled: raw.rate_limit?.enabled ?? false,
+			maxRequests: raw.rate_limit?.max_requests ?? 50,
+			windowMs: parseDurationWithDefault(raw.rate_limit?.window, 60_000),
+			trustedNetworks: raw.rate_limit?.trusted_networks ?? [],
+		},
 		jsonRpc: raw.json_rpc,
 		upstream: {
 			stateless: new Set(raw.upstream.stateless ?? []),
 			debug: {
 				stats: {
 					enabled: raw.upstream.debug?.stats?.enabled ?? false,
-					interval: raw.upstream.debug?.stats?.interval
-						? (parseDuration(raw.upstream.debug?.stats.interval) ?? 20_000)
-						: 20_000,
+					interval: parseDurationWithDefault(
+						raw.upstream.debug?.stats?.interval,
+						30_000,
+					),
 				},
 			},
 			servers: raw.upstream.servers.map(normalizeUpstreamServer),

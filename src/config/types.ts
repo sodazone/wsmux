@@ -32,7 +32,12 @@ type JsonRpcLimits = {
 
 export type ProxyConfig = {
 	log_level?: LogLevel;
-	maxOpenSockets?: number;
+	rate_limit?: {
+		enabled?: boolean;
+		max_requests?: number;
+		window?: DurationString;
+		trusted_networks?: string[];
+	};
 	upstream: {
 		debug?: {
 			stats?: {
@@ -58,9 +63,16 @@ export type UpstreamConfig = {
 	stateless: Set<string>;
 };
 
+export type ProxyRateLimitConfig = {
+	enabled: boolean;
+	maxRequests: number;
+	windowMs: number;
+	trustedNetworks: string[];
+};
+
 export type NormalizedConfig = {
 	logLevel: ProxyConfig["log_level"];
-	maxOpenSockets: number | undefined;
 	jsonRpc: ProxyConfig["json_rpc"];
+	rateLimit: ProxyRateLimitConfig;
 	upstream: UpstreamConfig;
 };

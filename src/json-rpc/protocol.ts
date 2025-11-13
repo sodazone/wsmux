@@ -10,7 +10,7 @@ const DEFAULT_MAX_PENDING_PER_CLIENT = 50;
 const DEFAULT_MAX_GLOBAL_PENDING = 500;
 const DEFAULT_REQUESTS_PER_SECOND = 20;
 
-export function createJsonRpcMiddleware(
+export function jsonRpcMiddleware(
 	registry: UpstreamRegistry,
 	methodHandlers: Record<string, JSONRPCMethodHandler>,
 ): JSONRPCMiddleware {

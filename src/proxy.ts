@@ -4,12 +4,13 @@ import client from "prom-client";
 import { getOpts } from "./cli/opts";
 import { loadConfig } from "./config";
 import type { JSONRPCContextData } from "./json-rpc";
-import { createJsonRpcMiddleware, createUpstreamRegistry } from "./json-rpc";
+import { createUpstreamRegistry, jsonRpcMiddleware } from "./json-rpc";
 import { polkadotMethods } from "./json-rpc/polkadot";
 import { initLogger } from "./logger";
 import { startJscMetrics } from "./runtime/metrics";
 import { createWebSocketHandler } from "./ws";
 import { metricsMiddleware } from "./ws/metrics";
+import { rateLimiterMiddleware } from "./ws/rate-limiter";
 
 async function run(
 	options: Bun.Serve.HostnamePortServeOptions<JSONRPCContextData> = {},
@@ -22,11 +23,17 @@ async function run(
 	const registry = createUpstreamRegistry(config.upstream);
 	await registry.connectAll();
 
+	const middlewares = [
+		metricsMiddleware(),
+		jsonRpcMiddleware(registry, polkadotMethods()),
+	];
+
+	if (config.rateLimit.enabled) {
+		middlewares.push(rateLimiterMiddleware(config.rateLimit));
+	}
+
 	const handler = createWebSocketHandler<JSONRPCContextData>({
-		middlewares: [
-			metricsMiddleware(),
-			createJsonRpcMiddleware(registry, polkadotMethods()),
-		],
+		middlewares,
 	});
 
 	startJscMetrics();
@@ -41,7 +48,7 @@ async function run(
 				});
 			}
 
-			if (server.upgrade(req, { data: {} })) return;
+			if (server.upgrade(req, { data: { headers: req.headers } })) return;
 			return new Response("Upgrade required", { status: 426 });
 		},
 		websocket: handler,
