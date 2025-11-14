@@ -71,7 +71,7 @@ export type ProxyRateLimitConfig = {
 
 export type NormalizedConfig = {
 	logLevel: ProxyConfig["log_level"];
-	jsonRpc: ProxyConfig["json_rpc"];
+	jsonRpc: JsonRpcLimits;
 	rateLimit: ProxyRateLimitConfig;
 	upstream: UpstreamConfig;
 };
