@@ -8,6 +8,7 @@ import { chainHead_v1_unfollow } from "./chain-head/unfollow";
 import { chainHead_v1_unpin } from "./chain-head/unpin";
 import { forwardRequest } from "./forward";
 import { subscribeLegacy } from "./legacy/subscribe";
+import { unsubscribeLegacy } from "./legacy/unsubscribe";
 import { rpc_methods } from "./rpc-methods";
 
 export function polkadotMethods() {
@@ -27,17 +28,23 @@ export function polkadotMethods() {
 
 		// Legacy subscriptions
 		chain_subscribeNewHead: subscribeLegacy("chain_unsubscribeNewHead"),
+		chain_unsubscribeNewHead: unsubscribeLegacy,
 		chain_subscribeNewHeads: subscribeLegacy("chain_unsubscribeNewHeads"),
+		chain_unsubscribeNewHeads: unsubscribeLegacy,
 		chain_subscribeFinalizedHeads: subscribeLegacy(
 			"chain_unsubscribeFinalizedHeads",
 		),
+		chain_unsubscribeFinalizedHeads: unsubscribeLegacy,
 		chain_subscribeFinalizedHead: subscribeLegacy(
 			"chain_unsubscribeFinalizedHead",
 		),
+		chain_unsubscribeFinalizedHead: unsubscribeLegacy,
 		state_subscribeRuntimeVersion: subscribeLegacy(
 			"state_unsubscribeRuntimeVersion",
 		),
+		state_unsubscribeRuntimeVersion: unsubscribeLegacy,
 		state_subscribeStorage: subscribeLegacy("state_unsubscribeStorage"),
+		state_unsubscribeStorage: unsubscribeLegacy,
 
 		// Falback
 		__fallback: forwardRequest,
