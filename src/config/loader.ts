@@ -63,7 +63,7 @@ function normalizeConfig(raw: ProxyConfig): NormalizedConfig {
 			windowMs: parseDurationWithDefault(raw.rate_limit?.window, 60_000),
 			trustedNetworks: raw.rate_limit?.trusted_networks ?? [],
 		},
-		jsonRpc: raw.json_rpc,
+		jsonRpc: raw.json_rpc ?? {},
 		upstream: {
 			debug: {
 				stats: {
