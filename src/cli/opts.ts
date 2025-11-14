@@ -2,8 +2,6 @@ import { parseArgs } from "node:util";
 
 import { VERSION } from "../version";
 
-// NOTE: Bun automatically loads .env
-
 const DEFAULTS = {
 	config: process.env.WSMUX_CONFIG ?? "./wsmux.config.yaml",
 	listen: process.env.WSMUX_LISTEN || ":8181",
