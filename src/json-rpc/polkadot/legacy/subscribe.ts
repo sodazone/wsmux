@@ -8,7 +8,7 @@ import { metrics } from "./metrics/subscribe.metrics";
 
 const logger = getLogger(["wsmux", "polkadot", "legacy", "subscribe"]);
 
-const DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT = 5;
+const DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT = 50;
 
 export const subscribeLegacy = (
 	unsubscribeMethodName: string,
