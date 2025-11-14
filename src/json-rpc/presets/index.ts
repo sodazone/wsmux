@@ -135,6 +135,7 @@ const polkadot_v1 = [
 const presets: Record<string, string[]> = {
 	polkadot_v1,
 	polkadot_legacy,
+	polkadot: Array.from(new Set([...polkadot_v1, ...polkadot_legacy])),
 };
 
 export const resolvePreset = (presetName: string): string[] => {
