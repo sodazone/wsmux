@@ -21,8 +21,7 @@ export function createUpstreamRegistry(
 			(s) =>
 				s.isReady() &&
 				s.hasCapacity() &&
-				(s.supportedMethods === undefined ||
-					s.supportedMethods.includes(method)),
+				(s.supportedMethods === undefined || s.supportedMethods.has(method)),
 		);
 		if (candidates.length === 0) return undefined;
 		lastIndex = (lastIndex + 1) % candidates.length;

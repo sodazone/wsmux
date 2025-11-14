@@ -7,18 +7,20 @@ import {
 import { chainHead_v1_unfollow } from "./chain-head/unfollow";
 import { chainHead_v1_unpin } from "./chain-head/unpin";
 import { forwardRequest } from "./forward";
+import { rpc_methods } from "./rpc-methods";
 
 export function polkadotMethods() {
 	return {
-		__fallback: forwardRequest,
+		rpc_methods,
 		chainHead_v1_follow: chainHead_v1_follow(),
-		chainHead_v1_unfollow: chainHead_v1_unfollow,
-		chainHead_v1_unpin: chainHead_v1_unpin,
+		chainHead_v1_unfollow,
+		chainHead_v1_unpin,
 		chainHead_v1_header: chainHead_v1_header(),
 		chainHead_v1_storage: chainHead_v1_forward,
 		chainHead_v1_body: chainHead_v1_forward,
 		chainHead_v1_call: chainHead_v1_forward,
 		chainHead_v1_continue: chainHead_v1_forward,
 		chainHead_v1_stopOperation: chainHead_v1_forward,
+		__fallback: forwardRequest,
 	} as const satisfies Record<string, JSONRPCMethodHandler>;
 }

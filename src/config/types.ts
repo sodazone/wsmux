@@ -17,6 +17,7 @@ export type RawUpstreamServerConfig = {
 
 	max_connections?: number;
 	supported_methods?: "*" | string[];
+	presets?: string | string[];
 	methods?: Record<string, UpstreamMethodLimits>;
 };
 

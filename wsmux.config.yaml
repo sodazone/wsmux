@@ -22,7 +22,6 @@ upstream:
   # (2) it can be served equivalently from any node, at any time, without breaking logical consistency.
   stateless:
     [
-      rpc_methods,
       chainSpec_v1_chainName,
       chainSpec_v1_genesisHash,
       chainSpec_v1_properties,
@@ -32,20 +31,24 @@ upstream:
       system_properties,
     ]
   servers:
-    - name: chaos
-      url: ws://localhost:9944
-      request_timeout: 5s
-      connection_timeout: 10s
-      max_connections: 100
-      retry_delay: 1s
+    - name: subway
+      url: ws://localhost:9945
+      presets: polkadot_legacy
+    #- name: chaos
+    #  url: ws://localhost:9944
+    #  request_timeout: 5s
+    #  connection_timeout: 10s
+    #  max_connections: 100
+    #  retry_delay: 1s
     - name: stakeworld
       url: wss://dot-rpc.stakeworld.io
+      presets: polkadot_v1
       methods:
         chainHead_v1_follow:
           max_subscribers: 4
     - name: helix
       url: wss://rpc-polkadot.helixstreet.io
-      supported_methods: "*"
+      presets: polkadot_v1
       methods:
         chainHead_v1_follow:
           max_subscribers: 4

@@ -37,7 +37,7 @@ export type UpstreamServer = {
 	removeUnsubscriber(localId: string): void;
 	unsubscribe: (localId: string) => void;
 	message$: Observable<JSONRPCResponse | JSONRPCNotification>;
-	supportedMethods?: string[];
+	supportedMethods?: Set<string>;
 	request(req: JSONRPCRequest): Promise<JSONRPCResponse | JSONRPCError>;
 	send(req: JSONRPCRequest): void;
 	config: {
@@ -68,7 +68,7 @@ export type UpstreamServerConfig = {
 	requestTimeout?: number;
 	connectionTimeout?: number;
 	maxConnections?: number;
-	supportedMethods?: string[];
+	supportedMethods?: Set<string>;
 	retryDelay?: number;
 	methods?: Record<string, any>;
 };

@@ -1,4 +1,5 @@
 import { YAML } from "bun";
+import { resolvePreset } from "../json-rpc/presets";
 import type { UpstreamServerConfig } from "../json-rpc/upstream";
 import type {
 	DurationString,
@@ -30,6 +31,17 @@ function parseDurationWithDefault(
 function normalizeUpstreamServer(
 	u: RawUpstreamServerConfig,
 ): UpstreamServerConfig {
+	let supportedMethods: Set<string> | undefined;
+
+	if (u.presets) {
+		const presets = Array.isArray(u.presets) ? u.presets : [u.presets];
+		supportedMethods = new Set(presets.flatMap(resolvePreset));
+	} else {
+		supportedMethods =
+			u.supported_methods === "*" || !u.supported_methods
+				? undefined
+				: new Set(u.supported_methods);
+	}
 	return {
 		name: u.name,
 		url: u.url,
@@ -37,12 +49,7 @@ function normalizeUpstreamServer(
 		connectionTimeout: parseDuration(u.connection_timeout),
 		retryDelay: parseDuration(u.retry_delay),
 		maxConnections: u.max_connections,
-
-		supportedMethods:
-			u.supported_methods === "*" || !u.supported_methods
-				? undefined
-				: [...u.supported_methods],
-
+		supportedMethods,
 		methods: u.methods ?? {},
 	};
 }
