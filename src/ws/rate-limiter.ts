@@ -2,7 +2,7 @@ import { getLogger } from "@logtape/logtape";
 
 import type { ProxyRateLimitConfig } from "../config";
 import type { JSONRPCContextData } from "../json-rpc";
-import { createTrustedIPs } from "../net/trusted-ip";
+import { createTrustedIPs } from "../util/net/trusted-ip";
 import type { WebSocketMiddleware } from "./handler";
 
 const DEFAULT_FLUSH_INTERVAL = 60_000; // 60s
