@@ -16,8 +16,9 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRY_DELAY_MS = 2_000;
 const DEFAULT_MAX_CONNECTIONS = 200;
+const MAX_BACKOFF_MS = 10 * 60 * 1_000;
 
-const logger = getLogger(["wsmux", "upstream"]);
+const logger = getLogger(["wsmux", "upstream", "server"]);
 
 function createMessageSubject() {
 	return new Subject<JSONRPCResponse | JSONRPCNotification>();
@@ -41,6 +42,7 @@ export function createUpstreamServer({
 	let stopped = false;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	let unhealthy = false;
+	let currentBackoff = retryDelay;
 	let _connections = 0;
 
 	function cleanup() {
@@ -49,6 +51,18 @@ export function createUpstreamServer({
 		states.clear();
 		subscriptions.abort();
 		_connections = 0;
+	}
+
+	function scheduleReconnect() {
+		if (stopped) return;
+
+		const delay = Math.min(currentBackoff, MAX_BACKOFF_MS);
+		logger.debug`[${url}] scheduling reconnect in ${delay}ms`;
+
+		reconnectTimer = setTimeout(() => {
+			connect();
+			currentBackoff = Math.min(currentBackoff * 2, MAX_BACKOFF_MS);
+		}, delay);
 	}
 
 	async function connect() {
@@ -60,6 +74,7 @@ export function createUpstreamServer({
 		ws.onopen = () => {
 			logger.info`[${url}] connected ok`;
 			unhealthy = false;
+			currentBackoff = retryDelay;
 			connection$.next(ws);
 		};
 
@@ -73,9 +88,7 @@ export function createUpstreamServer({
 				message$.complete();
 			} else {
 				cleanup();
-
-				logger.debug`[${url}] scheduling reconnect in ${retryDelay}ms`;
-				reconnectTimer = setTimeout(connect, retryDelay);
+				scheduleReconnect();
 			}
 		};
 
@@ -213,7 +226,7 @@ export function createUpstreamServer({
 					take(1),
 					timeout(timeoutMs),
 				),
-			).then(() => {});
+			);
 		},
 
 		getOrCreateState<T>(id: string, factory: () => T) {

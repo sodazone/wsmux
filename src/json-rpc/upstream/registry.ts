@@ -1,8 +1,12 @@
+import { getLogger } from "@logtape/logtape";
+
 import type { UpstreamConfig } from "../../config";
 import type { JSONRPCContextData } from "../types";
 import { createUpstreamServer } from "./server";
 import { startServerStats } from "./stats";
 import type { UpstreamRegistry, UpstreamServer } from "./types";
+
+const logger = getLogger(["wsmux", "upstream", "registry"]);
 
 export function createUpstreamRegistry(
 	config: UpstreamConfig,
@@ -76,7 +80,15 @@ export function createUpstreamRegistry(
 			await Promise.all(
 				servers.map(async (server) => {
 					await server.connect();
-					await server.waitForReady();
+					try {
+						await server.waitForReady();
+					} catch (err: any) {
+						if (err.name === "TimeoutError") {
+							logger.warn(`Timeout waiting for ready: ${server.url}`);
+						} else {
+							throw err;
+						}
+					}
 				}),
 			);
 		},

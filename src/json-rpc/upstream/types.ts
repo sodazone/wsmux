@@ -49,7 +49,7 @@ export type UpstreamServer = {
 		inc(): void;
 		dec(): void;
 	};
-	waitForReady(): Promise<void>;
+	waitForReady(timeout?: number): Promise<unknown>;
 	connect(): Promise<void>;
 	stop(): void;
 	getOrCreateState<T>(id: string, factory: () => T): T;
