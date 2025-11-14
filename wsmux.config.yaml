@@ -19,8 +19,8 @@ upstream:
       interval: 30s
   servers:
     - name: subway
-      url: wss://polkadot-rpc.publicnode.com
-      #url: ws://localhost:9945
+      #url: wss://polkadot-rpc.publicnode.com
+      url: ws://localhost:9945
       presets: polkadot_legacy
     #- name: chaos
     #  url: ws://localhost:9944
@@ -41,6 +41,6 @@ upstream:
         chainHead_v1_follow:
           max_subscribers: 4
 json_rpc:
-  max_pending_requests_per_connection: 50
+  max_pending_requests_per_connection: 150
   max_pending_requests: 500
-  max_requests_per_second: 20
+  max_requests_per_second: 150

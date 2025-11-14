@@ -1,3 +1,4 @@
+import { getLogger } from "@logtape/logtape";
 import { getConfig } from "../config";
 import { createDownstream } from "./downstream";
 import { jsonRpcError } from "./errors";
@@ -8,7 +9,9 @@ import { isJsonRpcRequest } from "./util";
 
 const DEFAULT_MAX_PENDING_PER_CLIENT = 50;
 const DEFAULT_MAX_GLOBAL_PENDING = 500;
-const DEFAULT_REQUESTS_PER_SECOND = 20;
+const DEFAULT_REQUESTS_PER_SECOND = 100;
+
+const logger = getLogger(["wsmux", "json-rpc"]);
 
 export function jsonRpcMiddleware(
 	registry: UpstreamRegistry,
@@ -62,7 +65,7 @@ export function jsonRpcMiddleware(
 			}
 
 			if (client.requestsInPeriod(1_000) >= max_requests_per_second) {
-				ctx.ws.close(1013, "Rate limit exceeded");
+				ctx.ws.close(1013, "JSON-RPC Rate limit exceeded");
 				return;
 			}
 
@@ -70,7 +73,7 @@ export function jsonRpcMiddleware(
 				client.pendingRequests >= max_pending_requests_per_connection ||
 				globalPending >= max_pending_requests
 			) {
-				ctx.ws.close(1013, "Too many concurrent requests");
+				ctx.ws.close(1013, "JSON-RPC Too many concurrent requests");
 				return;
 			}
 
@@ -80,13 +83,14 @@ export function jsonRpcMiddleware(
 			try {
 				const upstream = registry.resolveUpstream(ctx.ws.data, req.method);
 				if (!upstream) {
-					client.close(1013, "Upstream Unavailable");
+					client.close(1013, "JSON-RPC Upstream Unavailable");
 					return;
 				}
 
 				await handleRPCMethod(client, upstream, req, methodHandlers);
 			} catch (err) {
-				console.error("Error handling JSON-RPC message:", err);
+				logger.error("Error handling JSON-RPC message: {err}", { err });
+
 				client.send(
 					jsonRpcError({
 						kind: "INTERNAL_ERROR",

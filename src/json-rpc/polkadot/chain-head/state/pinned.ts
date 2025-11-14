@@ -43,6 +43,7 @@ export function createPinnedBlocks() {
 
 						upstream.send({
 							jsonrpc: "2.0",
+							id: upstream.nextId(),
 							method: "chainHead_v1_unpin",
 							params: [upstreamSubId, hash],
 						});

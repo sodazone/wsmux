@@ -31,7 +31,7 @@ export type SharedSubscriptionGroup = ReturnType<
 
 export type UpstreamServer = {
 	url: string;
-	nextId: number;
+	nextId(): number;
 	subscriptions: SharedSubscriptionGroup;
 	setUnsubscriber(localId: string, unsub: () => void): void;
 	removeUnsubscriber(localId: string): void;

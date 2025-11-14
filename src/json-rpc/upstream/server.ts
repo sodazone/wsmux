@@ -44,6 +44,7 @@ export function createUpstreamServer({
 	let unhealthy = false;
 	let currentBackoff = retryDelay;
 	let _connections = 0;
+	let _nextId = 0;
 
 	function cleanup() {
 		if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -108,7 +109,9 @@ export function createUpstreamServer({
 
 	const server: UpstreamServer = {
 		url,
-		nextId: 0,
+		nextId() {
+			return _nextId++;
+		},
 		config: {
 			methods,
 		},
@@ -127,7 +130,7 @@ export function createUpstreamServer({
 
 		connections,
 
-		send(req: JSONRPCRequest) {
+		send(req: JSONRPCRequest | JSONRPCNotification) {
 			const ws = connection$.value;
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
 				logger.warn("send while upstream not connected");
@@ -139,7 +142,7 @@ export function createUpstreamServer({
 		async request(
 			req: JSONRPCRequest,
 		): Promise<JSONRPCResponse | JSONRPCError> {
-			const upstreamId = server.nextId++;
+			const upstreamId = server.nextId();
 			const ws = connection$.value;
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
 				throw new Error("Upstream not connected");
