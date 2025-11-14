@@ -7,7 +7,7 @@ import { isSuccess } from "../../util";
 
 const logger = getLogger(["wsmux", "polkadot", "legacy", "subscribe"]);
 
-// TODO handle unsubscribe explicit verb in a separate method handler
+// TODO add some resource limits
 export const subscribeLegacy = (
 	unsubscribeMethodName: string,
 ): JSONRPCMethodHandler => {
