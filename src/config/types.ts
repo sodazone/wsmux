@@ -47,7 +47,6 @@ export type ProxyConfig = {
 			};
 		};
 		servers: RawUpstreamServerConfig[];
-		stateless: string[];
 	};
 	json_rpc?: JsonRpcLimits;
 	subscription?: SubscriptionOptions;
@@ -61,7 +60,6 @@ export type UpstreamConfig = {
 		};
 	};
 	servers: UpstreamServerConfig[];
-	stateless: Set<string>;
 };
 
 export type ProxyRateLimitConfig = {

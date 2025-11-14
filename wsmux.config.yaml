@@ -17,22 +17,10 @@ upstream:
     stats:
       enabled: false
       interval: 30s
-  # A method is stateless if
-  # (1) its result does not depend on the node’s current chain tip or state, and
-  # (2) it can be served equivalently from any node, at any time, without breaking logical consistency.
-  stateless:
-    [
-      chainSpec_v1_chainName,
-      chainSpec_v1_genesisHash,
-      chainSpec_v1_properties,
-      system_name,
-      system_chainType,
-      system_version,
-      system_properties,
-    ]
   servers:
     - name: subway
-      url: ws://localhost:9945
+      url: wss://polkadot-rpc.publicnode.com
+      #url: ws://localhost:9945
       presets: polkadot_legacy
     #- name: chaos
     #  url: ws://localhost:9944

@@ -65,7 +65,6 @@ function normalizeConfig(raw: ProxyConfig): NormalizedConfig {
 		},
 		jsonRpc: raw.json_rpc,
 		upstream: {
-			stateless: new Set(raw.upstream.stateless ?? []),
 			debug: {
 				stats: {
 					enabled: raw.upstream.debug?.stats?.enabled ?? false,

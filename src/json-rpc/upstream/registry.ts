@@ -12,7 +12,6 @@ export function createUpstreamRegistry(
 	config: UpstreamConfig,
 ): UpstreamRegistry {
 	const servers = config.servers.map(createUpstreamServer);
-	const statelessMethods = config.stateless;
 	const clientUpstream = new Map<number, UpstreamServer>();
 	let lastIndex = -1;
 
@@ -33,12 +32,6 @@ export function createUpstreamRegistry(
 	};
 
 	const resolveUpstream = (ctx: JSONRPCContextData, method: string) => {
-		// stateless
-		if (statelessMethods.has(method)) {
-			return pickServer(method);
-		}
-
-		// stateful
 		const client = ctx.client;
 		if (client === undefined) {
 			return undefined;
