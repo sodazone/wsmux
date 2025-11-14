@@ -1,5 +1,6 @@
 {
 	"name": "wsmux",
+	"version": "0.0.1",
 	"module": "src/proxy.ts",
 	"type": "module",
 	"private": true,

@@ -1,5 +1,7 @@
 import { parseArgs } from "node:util";
 
+import { VERSION } from "../version";
+
 // NOTE: Bun automatically loads .env
 
 const DEFAULTS = {
@@ -47,12 +49,18 @@ export function getOpts() {
 		args: Bun.argv.slice(2),
 		options: {
 			help: { type: "boolean", short: "h" },
+			version: { type: "boolean", short: "V" },
 			config: { type: "string", short: "c" },
 			listen: { type: "string", short: "l" },
 		},
 		strict: true,
 		allowPositionals: true,
 	});
+
+	if (values.version) {
+		console.log(`wsmux ${VERSION}`);
+		process.exit(0);
+	}
 
 	if (values.help) {
 		console.log(`
@@ -61,6 +69,7 @@ Usage: wsmux [options]
 Options:
   -c, --config <path>   Configuration file
   -l, --listen <addr>   Listening address (host:port, :port, [::]:port)
+  -V, --version         Show version number
   -h, --help            Show this help message
 
 Environment variables:
