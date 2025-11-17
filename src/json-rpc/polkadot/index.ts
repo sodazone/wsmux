@@ -1,9 +1,7 @@
 import type { JSONRPCMethodHandler } from "../methods";
 import { chainHead_v1_follow } from "./chain-head/follow";
-import {
-	chainHead_v1_forward,
-	chainHead_v1_header,
-} from "./chain-head/forward";
+import { chainHead_v1_forward } from "./chain-head/forward";
+import { chainHead_v1_header } from "./chain-head/header";
 import { chainHead_v1_unfollow } from "./chain-head/unfollow";
 import { chainHead_v1_unpin } from "./chain-head/unpin";
 import { forwardRequest } from "./forward";
