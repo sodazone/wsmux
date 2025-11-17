@@ -37,6 +37,7 @@ export type UpstreamServer = {
 	removeUnsubscriber(localId: string): void;
 	unsubscribe: (localId: string) => void;
 	message$: Observable<JSONRPCResponse | JSONRPCNotification>;
+	notification$: Observable<JSONRPCNotification>;
 	supportedMethods?: Set<string>;
 	request(req: JSONRPCRequest): Promise<JSONRPCResponse | JSONRPCError>;
 	send(req: JSONRPCRequest): void;

@@ -118,6 +118,10 @@ export function createUpstreamServer({
 		supportedMethods,
 		subscriptions,
 		message$,
+		notification$: message$.pipe(
+			filter((m): m is JSONRPCNotification => "method" in m),
+			map((m) => m as JSONRPCNotification),
+		),
 
 		isReady: () => {
 			const ws = connection$.value;
