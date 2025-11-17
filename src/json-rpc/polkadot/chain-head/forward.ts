@@ -1,18 +1,28 @@
-import { getLogger } from "@logtape/logtape";
-import { createCache } from "../../../util/cache";
+import type { DownstreamClient } from "../../downstream";
 import { jsonRpcError } from "../../errors";
 import type { JSONRPCMethodHandler } from "../../methods";
 import type { JSONRPCRequest, JSONRPCResponse } from "../../types";
-import { isSuccess } from "../../util";
+import type { UpstreamServer } from "../../upstream";
 
-const logger = getLogger(["wsmux", "chainhead", "forward"]);
+export type ForwardContext = {
+	upstreamSubId: string;
+	upstream: UpstreamServer;
+	downstream: DownstreamClient;
+};
 
-const forwardChainHeadHandler = ({
+export const forwardChainHeadHandler = ({
 	beforeRequest,
 	afterResponse,
 }: {
-	beforeRequest?: (req: JSONRPCRequest) => JSONRPCResponse | undefined;
-	afterResponse?: (req: JSONRPCRequest, res: JSONRPCResponse) => void;
+	beforeRequest?: (
+		req: JSONRPCRequest,
+		ctx: ForwardContext,
+	) => JSONRPCResponse | "STOP" | undefined;
+	afterResponse?: (
+		req: JSONRPCRequest,
+		res: JSONRPCResponse,
+		ctx: ForwardContext,
+	) => void;
 }): JSONRPCMethodHandler => {
 	return {
 		async handleRequest(upstream, downstream, req) {
@@ -50,7 +60,16 @@ const forwardChainHeadHandler = ({
 			};
 
 			if (beforeRequest) {
-				const res = beforeRequest(upstreamReq);
+				const res = beforeRequest(upstreamReq, {
+					upstreamSubId: shared.upstreamSubId,
+					upstream,
+					downstream,
+				});
+
+				if (res === "STOP") {
+					return;
+				}
+
 				if (res) {
 					downstream.send(res);
 					return;
@@ -59,7 +78,11 @@ const forwardChainHeadHandler = ({
 
 			try {
 				const response = await upstream.request(upstreamReq);
-				afterResponse?.(req, response);
+				afterResponse?.(req, response, {
+					upstreamSubId: shared.upstreamSubId,
+					upstream,
+					downstream,
+				});
 				downstream.send(response);
 			} catch (err) {
 				downstream.send(
@@ -75,34 +98,3 @@ const forwardChainHeadHandler = ({
 
 export const chainHead_v1_forward: JSONRPCMethodHandler =
 	forwardChainHeadHandler({});
-
-export const chainHead_v1_header = (maxSize = 100): JSONRPCMethodHandler => {
-	const cache = createCache<JSONRPCResponse>(maxSize);
-	const keyOf: (req: JSONRPCRequest) => string = (req) => req.params[1];
-
-	return forwardChainHeadHandler({
-		beforeRequest: (req) => {
-			const res = cache.get(keyOf(req));
-			if (res) {
-				return {
-					...res,
-					id: req.id,
-				} as JSONRPCResponse;
-			}
-		},
-		afterResponse: (req, res) => {
-			if (isSuccess(res)) {
-				if (res.result != null && typeof res.result === "string") {
-					cache.set(keyOf(req), res);
-				} else {
-					logger.debug(
-						(l) =>
-							l`Empty response for ${keyOf(req)} [req=${JSON.stringify(req)}, res=${JSON.stringify(res)}]`,
-					);
-				}
-			} else {
-				logger.error(`Error response for ${keyOf(req)}`);
-			}
-		},
-	});
-};
