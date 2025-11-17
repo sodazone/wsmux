@@ -23,14 +23,16 @@ async function run(
 	const registry = createUpstreamRegistry(config.upstream);
 	await registry.connectAll();
 
-	const middlewares = [
-		metricsMiddleware(),
-		jsonRpcMiddleware(registry, polkadotMethods()),
-	];
+	const middlewares = [];
 
 	if (config.rateLimit.enabled) {
 		middlewares.push(rateLimiterMiddleware(config.rateLimit));
 	}
+
+	middlewares.push(
+		metricsMiddleware(),
+		jsonRpcMiddleware(registry, polkadotMethods()),
+	);
 
 	const handler = createWebSocketHandler<JSONRPCContextData>({
 		middlewares,
