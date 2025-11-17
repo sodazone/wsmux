@@ -3,6 +3,11 @@ permissions:
   contents: write
 on:
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: "Tag name for manual release (e.g. v1.2.3)"
+        required: true
+        type: string
   push:
     tags:
       - "v*.*.*"
@@ -22,4 +27,5 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
           files: dist/wsmux-x64-modern
