@@ -6,7 +6,8 @@
 	"private": true,
 	"scripts": {
 		"start": "bun run src/proxy.ts",
-		"lint": "biome check --write"
+		"lint": "biome check --write",
+		"dist": "bun build ./src/proxy.ts --compile --outfile dist/wsmux"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.6",
