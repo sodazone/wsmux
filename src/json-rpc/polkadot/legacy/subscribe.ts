@@ -10,7 +10,6 @@ const logger = getLogger(["wsmux", "polkadot", "legacy", "subscribe"]);
 
 const DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT = 50;
 
-// TODO: check proper clean up on shutdown
 export const subscribeLegacy = (
 	unsubscribeMethodName: string,
 	maxPerClient = DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT,
@@ -33,6 +32,8 @@ export const subscribeLegacy = (
 				});
 				return;
 			}
+
+			if (downstream.closed) return;
 
 			const response = await upstream.request(req);
 
@@ -57,38 +58,35 @@ export const subscribeLegacy = (
 								!("id" in msg) && msg.params?.subscription === upstreamSubId,
 						),
 					)
-					.subscribe((msg) => {
-						const n = msg as JSONRPCNotification;
-						n.params.subscription = localId;
-						downstream.send({
-							...msg,
-							params: {
-								...n.params,
-								subscription: localId,
-							},
-						});
+					.subscribe({
+						next: (msg) => {
+							if (downstream.closed) return;
+							const n = msg as JSONRPCNotification;
+							downstream.send({
+								...msg,
+								params: { ...n.params, subscription: localId },
+							});
+						},
+						error: () => cleanup(),
+						complete: () => cleanup(),
 					});
 
 				metrics.subscribe(upstream.url, req.method);
 
-				upstream.setUnsubscriber(localId, () => {
+				let cleaned = false;
+				const cleanup = () => {
+					if (cleaned) return;
+					cleaned = true;
+
 					try {
 						rxSub.unsubscribe();
-					} catch {
-						//
-					}
+					} catch {}
 
-					const currentCount = activeCounts.get(clientId) ?? 1;
-					const nextCount = Math.max(0, currentCount - 1);
-					if (nextCount === 0) {
-						activeCounts.delete(clientId);
-					} else {
-						activeCounts.set(clientId, nextCount);
-					}
+					const cnt = activeCounts.get(clientId) ?? 1;
+					const next = Math.max(0, cnt - 1);
+					if (next === 0) activeCounts.delete(clientId);
+					else activeCounts.set(clientId, next);
 
-					logger.info(
-						`[${req.method}:${upstreamSubId}] unsubscribe (${nextCount})`,
-					);
 					upstream.send({
 						jsonrpc: "2.0",
 						id: upstream.nextId(),
@@ -97,7 +95,9 @@ export const subscribeLegacy = (
 					});
 
 					metrics.unsubscribe(upstream.url, unsubscribeMethodName);
-				});
+				};
+
+				upstream.setUnsubscriber(localId, cleanup);
 
 				downstream.addCloseFn(() => {
 					upstream.unsubscribe(localId);
