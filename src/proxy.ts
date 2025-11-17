@@ -68,7 +68,6 @@ async function run(
 	};
 
 	process.on("SIGINT", shutdown);
-	process.on("SIGTERM", shutdown);
 
 	return server;
 }
