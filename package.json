@@ -7,7 +7,7 @@
 	"scripts": {
 		"start": "bun run src/proxy.ts",
 		"lint": "biome check --write",
-		"dist": "bun build ./src/proxy.ts --compile --outfile dist/wsmux"
+		"dist": "bun build ./src/proxy.ts --compile --target=bun-linux-x64-modern --outfile dist/wsmux-x64-modern"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.2.6",
