@@ -1,5 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-
+import type { MethodCacheConfig } from "@/config";
 import { createCache } from "@/util/cache";
 import type { JSONRPCMethodHandler } from "../../methods";
 import type { JSONRPCRequest, JSONRPCResponse } from "../../types";
@@ -8,7 +8,9 @@ import { forwardChainHeadHandler } from "./forward";
 
 const logger = getLogger(["wsmux", "chainhead", "header"]);
 
-export const chainHead_v1_header = (maxSize = 100): JSONRPCMethodHandler => {
+export const chainHead_v1_header = ({
+	maxSize = 25,
+}: MethodCacheConfig = {}): JSONRPCMethodHandler => {
 	const cache = createCache<JSONRPCResponse>(maxSize);
 	const keyOf: (req: JSONRPCRequest) => string = (req) => req.params[1];
 

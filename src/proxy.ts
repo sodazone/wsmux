@@ -31,7 +31,7 @@ async function run(
 
 	middlewares.push(
 		metricsMiddleware(),
-		jsonRpcMiddleware(registry, polkadotMethods()),
+		jsonRpcMiddleware(registry, polkadotMethods(config.cache), config.jsonRpc),
 	);
 
 	const handler = createWebSocketHandler<JSONRPCContextData>({

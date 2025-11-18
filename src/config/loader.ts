@@ -64,6 +64,10 @@ function normalizeConfig(raw: ProxyConfig): NormalizedConfig {
 			trustedNetworks: raw.rate_limit?.trusted_networks ?? [],
 		},
 		jsonRpc: raw.json_rpc ?? {},
+		cache: raw.cache ?? {
+			enabled: false,
+			methods: {},
+		},
 		upstream: {
 			debug: {
 				stats: {

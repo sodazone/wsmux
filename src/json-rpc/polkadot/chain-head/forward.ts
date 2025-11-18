@@ -51,16 +51,8 @@ export const forwardChainHeadHandler = ({
 				return;
 			}
 
-			const upstreamReq = {
-				...req,
-				params: [
-					shared.upstreamSubId,
-					...(Array.isArray(req.params) ? req.params.slice(1) : []),
-				],
-			};
-
 			if (beforeRequest) {
-				const res = beforeRequest(upstreamReq, {
+				const res = beforeRequest(req, {
 					upstreamSubId: shared.upstreamSubId,
 					upstream,
 					downstream,
@@ -75,6 +67,14 @@ export const forwardChainHeadHandler = ({
 					return;
 				}
 			}
+
+			const upstreamReq = {
+				...req,
+				params: [
+					shared.upstreamSubId,
+					...(Array.isArray(req.params) ? req.params.slice(1) : []),
+				],
+			};
 
 			try {
 				const response = await upstream.request(upstreamReq);

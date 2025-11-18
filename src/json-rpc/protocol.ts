@@ -1,5 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-import { getConfig } from "../config";
+import type { JsonRpcLimits } from "../config/types";
 import { createDownstream } from "./downstream";
 import { jsonRpcError } from "./errors";
 import { handleRPCMethod, type JSONRPCMethodHandler } from "./methods";
@@ -16,14 +16,13 @@ const logger = getLogger(["wsmux", "json-rpc"]);
 export function jsonRpcMiddleware(
 	registry: UpstreamRegistry,
 	methodHandlers: Record<string, JSONRPCMethodHandler>,
+	config: JsonRpcLimits = {},
 ): JSONRPCMiddleware {
 	const {
-		jsonRpc: {
-			max_pending_requests = DEFAULT_MAX_GLOBAL_PENDING,
-			max_pending_requests_per_connection = DEFAULT_MAX_PENDING_PER_CLIENT,
-			max_requests_per_second = DEFAULT_REQUESTS_PER_SECOND,
-		} = {},
-	} = getConfig();
+		max_pending_requests = DEFAULT_MAX_GLOBAL_PENDING,
+		max_pending_requests_per_connection = DEFAULT_MAX_PENDING_PER_CLIENT,
+		max_requests_per_second = DEFAULT_REQUESTS_PER_SECOND,
+	} = config;
 
 	let globalPending = 0;
 

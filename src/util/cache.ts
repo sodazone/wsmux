@@ -1,6 +1,7 @@
 export type Cache<T> = {
 	get(key: string): T | undefined;
 	set(key: string, value: T): void;
+	remove(key: string): void;
 	clear(): void;
 };
 
@@ -24,6 +25,13 @@ export function createCache<T>(maxSize = 1_000): Cache<T> {
 					if (oldestKey !== undefined) cache.delete(oldestKey);
 					size--;
 				}
+			}
+		},
+
+		remove(key: string): void {
+			if (cache.has(key)) {
+				cache.delete(key);
+				size--;
 			}
 		},
 

@@ -25,7 +25,7 @@ type SubscriptionOptions = {
 	maxSubscribers?: number;
 };
 
-type JsonRpcLimits = {
+export type JsonRpcLimits = {
 	max_pending_requests_per_connection?: number;
 	max_pending_requests?: number;
 	max_requests_per_second?: number;
@@ -50,6 +50,7 @@ export type ProxyConfig = {
 	};
 	json_rpc?: JsonRpcLimits;
 	subscription?: SubscriptionOptions;
+	cache?: CacheConfig;
 };
 
 export type UpstreamConfig = {
@@ -69,9 +70,20 @@ export type ProxyRateLimitConfig = {
 	trustedNetworks: string[];
 };
 
+export type MethodCacheConfig = Partial<{
+	enabled: boolean;
+	maxSize: number;
+}>;
+
+export type CacheConfig = {
+	enabled: boolean;
+	methods: Record<string, MethodCacheConfig>;
+};
+
 export type NormalizedConfig = {
 	logLevel: ProxyConfig["log_level"];
 	jsonRpc: JsonRpcLimits;
 	rateLimit: ProxyRateLimitConfig;
 	upstream: UpstreamConfig;
+	cache: CacheConfig;
 };
