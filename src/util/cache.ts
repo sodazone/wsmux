@@ -2,16 +2,21 @@ export type Cache<T> = {
 	get(key: string): T | undefined;
 	set(key: string, value: T): void;
 	remove(key: string): void;
+	size: number;
 	clear(): void;
 };
 
 export function createCache<T>(maxSize = 1_000): Cache<T> {
 	const cache = new Map<string, T>();
-	let size = 0;
+	let _size = 0;
 
 	return {
 		get(key: string): T | undefined {
 			return cache.get(key);
+		},
+
+		get size(): number {
+			return _size;
 		},
 
 		set(key: string, value: T): void {
@@ -19,11 +24,11 @@ export function createCache<T>(maxSize = 1_000): Cache<T> {
 				cache.set(key, value);
 			} else {
 				cache.set(key, value);
-				size++;
-				if (size > maxSize) {
+				_size++;
+				if (_size > maxSize) {
 					const oldestKey = cache.keys().next().value;
 					if (oldestKey !== undefined) cache.delete(oldestKey);
-					size--;
+					_size--;
 				}
 			}
 		},
@@ -31,13 +36,13 @@ export function createCache<T>(maxSize = 1_000): Cache<T> {
 		remove(key: string): void {
 			if (cache.has(key)) {
 				cache.delete(key);
-				size--;
+				_size--;
 			}
 		},
 
 		clear(): void {
 			cache.clear();
-			size = 0;
+			_size = 0;
 		},
 	};
 }

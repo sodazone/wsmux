@@ -10,6 +10,7 @@ import type {
 import { isSuccess } from "@/json-rpc/util";
 import { createCache } from "@/util/cache";
 import { forwardChainHeadHandler } from "../forward";
+import { chainHeadCacheMetrics } from "../metrics/cache.metrics";
 
 const logger = getLogger(["wsmux", "chainhead", "ops"]);
 
@@ -46,10 +47,12 @@ export const chainHead_v1_operation = ({
 
 			if (!cached) {
 				logger.debug((l) => l`[${key}] cache miss`);
+				chainHeadCacheMetrics.misses.labels(req.method).inc();
 				return;
 			}
 
 			logger.debug((l) => l`[${localId}:${key}] cache hit`);
+			chainHeadCacheMetrics.hits.labels(req.method).inc();
 
 			// Send original "started"
 			downstream.send({
@@ -59,6 +62,7 @@ export const chainHead_v1_operation = ({
 
 			// Replay buffer
 			for (const msg of cached.buffer) {
+				chainHeadCacheMetrics.replays.labels(req.method).inc();
 				downstream.send({
 					jsonrpc: "2.0",
 					method: msg.method,
@@ -142,6 +146,8 @@ export const chainHead_v1_operation = ({
 				notification$: notifications.asObservable(),
 			});
 
+			chainHeadCacheMetrics.items.labels(req.method).set(cache.size);
+
 			const forward = (msg: JSONRPCNotification) => {
 				downstream.send({
 					...msg,
@@ -184,6 +190,7 @@ export const chainHead_v1_operation = ({
 
 					if (errored) {
 						cache.remove(key);
+						chainHeadCacheMetrics.errors.labels(req.method).inc();
 					} else {
 						cache.set(key, {
 							started,
@@ -192,6 +199,8 @@ export const chainHead_v1_operation = ({
 							notification$: undefined,
 						});
 					}
+
+					chainHeadCacheMetrics.items.labels(req.method).set(cache.size);
 
 					logger.debug(
 						(l) =>

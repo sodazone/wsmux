@@ -5,6 +5,7 @@ import type { JSONRPCMethodHandler } from "../../methods";
 import type { JSONRPCRequest, JSONRPCResponse } from "../../types";
 import { isSuccess } from "../../util";
 import { forwardChainHeadHandler } from "./forward";
+import { chainHeadCacheMetrics } from "./metrics/cache.metrics";
 
 const logger = getLogger(["wsmux", "chainhead", "header"]);
 
@@ -18,16 +19,20 @@ export const chainHead_v1_header = ({
 		beforeRequest: (req) => {
 			const res = cache.get(keyOf(req));
 			if (res) {
+				chainHeadCacheMetrics.hits.labels(req.method).inc();
 				return {
 					...res,
 					id: req.id,
 				} as JSONRPCResponse;
 			}
+			chainHeadCacheMetrics.misses.labels(req.method).inc();
 		},
 		afterResponse: (req, res) => {
 			if (isSuccess(res)) {
 				if (res.result != null && typeof res.result === "string") {
 					cache.set(keyOf(req), res);
+
+					chainHeadCacheMetrics.items.labels(req.method).set(cache.size);
 				} else {
 					logger.debug(
 						(l) =>
