@@ -1,6 +1,8 @@
 import { getLogger } from "@logtape/logtape";
 
 import type { UpstreamConfig } from "../../config";
+import type { JSONRPCApexMethodHandler } from "../methods";
+import { resolveRoutingPreset } from "../presets/routing";
 import type { JSONRPCContextData } from "../types";
 import { createUpstreamServer } from "./server";
 import { startServerStats } from "./stats";
@@ -13,6 +15,14 @@ export function createUpstreamRegistry(
 ): UpstreamRegistry {
 	const servers = config.servers.map(createUpstreamServer);
 	const clientUpstream = new Map<number, UpstreamServer>();
+	const apex = Object.fromEntries(
+		config.apex
+			.map(resolveRoutingPreset)
+			.flatMap((record) => Object.entries(record)),
+	);
+
+	logger.info(`#servers=${servers.length}, apex=${config.apex}`);
+
 	let lastIndex = -1;
 
 	if (config.debug.stats.enabled) {
@@ -31,7 +41,14 @@ export function createUpstreamRegistry(
 		return candidates[lastIndex];
 	};
 
+	const resolveApexMethod = (
+		method: string,
+	): JSONRPCApexMethodHandler | undefined => {
+		return apex[method];
+	};
+
 	const resolveUpstream = (ctx: JSONRPCContextData, method: string) => {
+		// by default methods are sticky
 		const client = ctx.client;
 		if (client === undefined) {
 			return undefined;
@@ -61,6 +78,7 @@ export function createUpstreamRegistry(
 
 	return {
 		servers,
+		resolveApexMethod,
 		resolveUpstream,
 		disconnect: (clientId: number) => {
 			const server = clientUpstream.get(clientId);

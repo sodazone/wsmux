@@ -46,6 +46,7 @@ export type ProxyConfig = {
 				interval?: DurationString;
 			};
 		};
+		apex?: string[];
 		servers: RawUpstreamServerConfig[];
 	};
 	json_rpc?: JsonRpcLimits;
@@ -60,6 +61,7 @@ export type UpstreamConfig = {
 			interval: number;
 		};
 	};
+	apex: string[];
 	servers: UpstreamServerConfig[];
 };
 

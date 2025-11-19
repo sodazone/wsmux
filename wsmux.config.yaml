@@ -44,6 +44,8 @@ upstream:
     stats:
       enabled: false
       interval: 30s
+  apex:
+    - polkadot
   servers:
     #- name: subway
     #  url: wss://polkadot-asset-hub-rpc.polkadot.io
@@ -57,13 +59,13 @@ upstream:
     #  retry_delay: 1s
     - name: stakeworld
       url: wss://dot-rpc.stakeworld.io
-      presets: polkadot_v1
+      presets: polkadot
       methods:
         chainHead_v1_follow:
           max_subscribers: 4
     - name: helix
       url: wss://rpc-polkadot.helixstreet.io
-      presets: polkadot_v1
+      presets: polkadot
       methods:
         chainHead_v1_follow:
           max_subscribers: 4

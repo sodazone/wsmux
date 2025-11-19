@@ -78,6 +78,7 @@ function normalizeConfig(raw: ProxyConfig): NormalizedConfig {
 					),
 				},
 			},
+			apex: raw.upstream.apex ?? [],
 			servers: raw.upstream.servers.map(normalizeUpstreamServer),
 		},
 	};
