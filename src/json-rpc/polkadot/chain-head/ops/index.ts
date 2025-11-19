@@ -106,9 +106,7 @@ export const chainHead_v1_operation = ({
 			return "STOP";
 		},
 
-		afterResponse: (req, res, { upstream, upstreamSubId, downstream }) => {
-			const localId = req.params[0];
-
+		afterResponse: (req, res, { upstream, upstreamSubId }) => {
 			if (!isSuccess(res)) {
 				logger.error(`Error response for ${keyOf(req)}`);
 				return;
@@ -148,16 +146,6 @@ export const chainHead_v1_operation = ({
 
 			chainHeadCacheMetrics.items.labels(req.method).set(cache.size);
 
-			const forward = (msg: JSONRPCNotification) => {
-				downstream.send({
-					...msg,
-					params: {
-						...msg.params,
-						subscription: localId,
-					},
-				});
-			};
-
 			const onUpstream = (msg: JSONRPCNotification) => {
 				if (!msg.params) return;
 
@@ -168,8 +156,6 @@ export const chainHead_v1_operation = ({
 				} else {
 					buffer.push(msg);
 				}
-
-				forward(msg);
 			};
 
 			notification$.subscribe({
