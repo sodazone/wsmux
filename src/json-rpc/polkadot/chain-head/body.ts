@@ -1,16 +1,14 @@
-import type { MethodCacheConfig } from "@/config";
+import type { CacheConfig } from "@/config";
 import type { JSONRPCMethodHandler } from "../../methods";
-import type { JSONRPCRequest } from "../../types";
-import { chainHead_v1_operation } from "./ops";
+import { chainHead_v1_operation } from "./ops/handler";
 
-export const chainHead_v1_body = ({
-	maxSize = 25,
-}: MethodCacheConfig = {}): JSONRPCMethodHandler => {
-	const keyOf: (req: JSONRPCRequest) => string = ({ params }) => params[1];
-
-	return chainHead_v1_operation({
-		maxSize,
-		keyOf,
-		terminalEvents: ["operationBodyDone"],
-	});
+export const chainHead_v1_body = (
+	config: CacheConfig,
+): JSONRPCMethodHandler => {
+	return chainHead_v1_operation(
+		config,
+		"chainHead_v1_body",
+		["operationBodyDone"],
+		({ params }) => params[1],
+	);
 };

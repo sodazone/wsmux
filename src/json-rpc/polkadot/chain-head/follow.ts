@@ -11,6 +11,7 @@ import type {
 	SharedSubscriptionPool,
 } from "../../upstream";
 import { observeFollow } from "./metrics/follow.metrics";
+import { filterOperationEvents } from "./ops/filter";
 import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
@@ -71,11 +72,10 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					result: localId,
 				});
 
-				shared.subscribeLocal(
-					localId,
-					downstream,
-					followNotifyTransform(request),
-				);
+				shared.subscribeLocal(localId, downstream, {
+					filter: filterOperationEvents,
+					transform: followNotifyTransform(request),
+				});
 
 				upstream.setUnsubscriber(localId, () => {
 					pinnedBlocks.unsubscribeLocal(upstream, localId);

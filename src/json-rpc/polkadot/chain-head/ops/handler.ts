@@ -1,6 +1,7 @@
 import { getLogger } from "@logtape/logtape";
 import { filter, type Observable, Subject, take, takeUntil } from "rxjs";
 
+import type { CacheConfig } from "@/config";
 import type { JSONRPCMethodHandler } from "@/json-rpc/methods";
 import type {
 	JSONRPCNotification,
@@ -11,6 +12,7 @@ import { isSuccess } from "@/json-rpc/util";
 import { createCache } from "@/util/cache";
 import { forwardChainHeadHandler } from "../forward";
 import { chainHeadCacheMetrics } from "../metrics/cache.metrics";
+import { isCacheEnabledFor, isStarted } from "./util";
 
 const logger = getLogger(["wsmux", "chainhead", "ops"]);
 
@@ -27,7 +29,97 @@ type CacheEntry = {
 	complete: boolean;
 };
 
-export const chainHead_v1_operation = ({
+export const chainHead_v1_operation = (
+	config: CacheConfig,
+	method: string,
+	terminalEvents: string[],
+	keyOf: (r: JSONRPCRequest) => string,
+): JSONRPCMethodHandler => {
+	if (isCacheEnabledFor(config, method)) {
+		return forwardWithCacheHandler({
+			maxSize: config.methods?.[method]?.maxSize ?? 25,
+			keyOf,
+			terminalEvents,
+		});
+	}
+	return forwardHandler({
+		terminalEvents,
+	});
+};
+
+const forwardHandler = ({
+	terminalEvents,
+}: {
+	terminalEvents: string[];
+}): JSONRPCMethodHandler => {
+	const terminus = new Set([...FLUSH_CACHE_EVENTS, ...terminalEvents]);
+
+	return forwardChainHeadHandler({
+		afterResponse: (req, res, { upstream, upstreamSubId, downstream }) => {
+			if (!isSuccess(res)) {
+				logger.error(`Error response for ${req.id}`);
+				return;
+			}
+
+			const localId = req.params[0];
+
+			if (!isStarted(res)) return;
+
+			const { operationId } = res.result;
+
+			const notifications = new Subject<JSONRPCNotification>();
+
+			const isForOp = (msg: JSONRPCNotification) =>
+				msg.params?.subscription === upstreamSubId &&
+				msg.params?.result?.operationId === operationId;
+
+			const done$ = upstream.notification$.pipe(
+				filter((msg) => isForOp(msg) && terminus.has(msg.params!.result.event)),
+				take(1),
+			);
+
+			const notification$ = upstream.notification$.pipe(
+				filter(isForOp),
+				takeUntil(done$),
+			);
+
+			const forward = (msg: JSONRPCNotification) => {
+				downstream.send({
+					...msg,
+					params: {
+						...msg.params,
+						subscription: localId,
+					},
+				});
+			};
+
+			const onUpstream = (msg: JSONRPCNotification) => {
+				if (!msg.params) return;
+				forward(msg);
+			};
+
+			notification$.subscribe({
+				next: (msg) => {
+					onUpstream(msg);
+					notifications.next(msg);
+				},
+				error: (err) => {
+					logger.error("notification$ upstream error {err}", err);
+					notifications.error(err);
+				},
+			});
+
+			done$.subscribe({
+				next: onUpstream,
+				complete: () => {
+					notifications.complete();
+				},
+			});
+		},
+	});
+};
+
+const forwardWithCacheHandler = ({
 	maxSize,
 	terminalEvents,
 	keyOf,
@@ -106,13 +198,15 @@ export const chainHead_v1_operation = ({
 			return "STOP";
 		},
 
-		afterResponse: (req, res, { upstream, upstreamSubId }) => {
+		afterResponse: (req, res, { upstream, upstreamSubId, downstream }) => {
+			const localId = req.params[0];
+
 			if (!isSuccess(res)) {
 				logger.error(`Error response for ${keyOf(req)}`);
 				return;
 			}
 
-			if (res.result?.result !== "started") return;
+			if (!isStarted(res)) return;
 
 			const key = keyOf(req);
 			const { operationId } = res.result;
@@ -146,6 +240,16 @@ export const chainHead_v1_operation = ({
 
 			chainHeadCacheMetrics.items.labels(req.method).set(cache.size);
 
+			const forward = (msg: JSONRPCNotification) => {
+				downstream.send({
+					...msg,
+					params: {
+						...msg.params,
+						subscription: localId,
+					},
+				});
+			};
+
 			const onUpstream = (msg: JSONRPCNotification) => {
 				if (!msg.params) return;
 
@@ -156,6 +260,8 @@ export const chainHead_v1_operation = ({
 				} else {
 					buffer.push(msg);
 				}
+
+				forward(msg);
 			};
 
 			notification$.subscribe({

@@ -43,8 +43,8 @@ export function observeSharedSubscription(
 			.set(active);
 	}
 
-	shared.subscribeLocal = (localId, downstream, transform) => {
-		origSub(localId, downstream, transform);
+	shared.subscribeLocal = (localId, downstream, opts) => {
+		origSub(localId, downstream, opts);
 		updateGauge();
 	};
 

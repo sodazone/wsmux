@@ -1,9 +1,9 @@
 import { getLogger } from "@logtape/logtape";
-import { identity, map, type Observable, type Subscription } from "rxjs";
+import { map, type Observable, type Subscription } from "rxjs";
 
 import type { DownstreamClient } from "../downstream";
 import type { JSONRPCNotification } from "../types";
-import type { SharedSubscription } from "./types";
+import type { SharedSubscription, SubscribeLocalOptions } from "./types";
 
 const logger = getLogger(["wsmux", "upstream", "shared"]);
 
@@ -117,8 +117,12 @@ function createSharedSubscriptionPool(
 			const origSubscribe = sub.subscribeLocal.bind(sub);
 			// TODO: we are recalculating iterating by all subs, potential performance issue
 			// consider using a min heap or priority queue to keep track of the least loaded subscription
-			sub.subscribeLocal = (localId: string, downstream: DownstreamClient) => {
-				origSubscribe(localId, downstream);
+			sub.subscribeLocal = (
+				localId: string,
+				downstream: DownstreamClient,
+				options?: SubscribeLocalOptions,
+			) => {
+				origSubscribe(localId, downstream, options);
 				localIdIndex.set(localId, sub);
 
 				let min: [string, SharedSubscription] | undefined;
@@ -249,7 +253,7 @@ function _createSharedSubscription(
 		{
 			subscription: Subscription;
 			downstream: DownstreamClient;
-			transform?: (notif: JSONRPCNotification) => JSONRPCNotification;
+			options?: SubscribeLocalOptions;
 		}
 	>();
 
@@ -305,7 +309,7 @@ function _createSharedSubscription(
 		subscribeLocal(
 			localId: string,
 			downstream: DownstreamClient,
-			transform?: (notif: JSONRPCNotification) => JSONRPCNotification,
+			options?: SubscribeLocalOptions,
 		) {
 			if (this.hasLocalSubscription(localId)) {
 				throw Error(`Subscription with ID ${localId} already exists`);
@@ -315,7 +319,17 @@ function _createSharedSubscription(
 				this.unsubscribeLocal(localId);
 			});
 
-			const subscription = source$.pipe(map(transform ?? identity)).subscribe({
+			let piped$ = source$;
+
+			if (options?.filter) {
+				piped$ = piped$.pipe(options.filter);
+			}
+
+			if (options?.transform) {
+				piped$ = piped$.pipe(map(options.transform));
+			}
+
+			const subscription = piped$.subscribe({
 				next: (notif) => {
 					if (aborted) return;
 					try {
@@ -338,7 +352,7 @@ function _createSharedSubscription(
 			localSubs.set(localId, {
 				subscription,
 				downstream,
-				transform,
+				options,
 			});
 		},
 

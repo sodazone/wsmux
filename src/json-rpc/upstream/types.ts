@@ -9,11 +9,18 @@ import type {
 } from "../types";
 import type { createSharedSubscriptionGroup } from "./shared";
 
+export type SubscribeLocalOptions = {
+	filter?: (
+		src$: Observable<JSONRPCNotification>,
+	) => Observable<JSONRPCNotification>;
+	transform?: (notification: JSONRPCNotification) => JSONRPCNotification;
+};
+
 export type SharedSubscription = {
 	subscribeLocal(
 		localId: string,
 		downstream: DownstreamClient,
-		options?: Record<string, any>,
+		options?: SubscribeLocalOptions,
 	): void;
 	unsubscribeLocal(localId: string): void;
 	hasLocalSubscription(localId: string): boolean;
