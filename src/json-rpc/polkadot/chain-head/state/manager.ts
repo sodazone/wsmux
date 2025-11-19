@@ -18,7 +18,8 @@ type Snapshot = {
 	initialized?: JSONRPCNotification;
 	finalized?: string;
 	runtime?: unknown;
-	events: JSONRPCNotification[];
+	bestBlockChanged?: JSONRPCNotification;
+	newBlocks: JSONRPCNotification[];
 };
 
 const logger = getLogger(["wsmux", "chainhead", "state"]);
@@ -26,7 +27,7 @@ const logger = getLogger(["wsmux", "chainhead", "state"]);
 export type StateManager = ReturnType<typeof createStateManager>;
 
 export function createStateManager() {
-	const snapshot: Snapshot = { events: [] };
+	const snapshot: Snapshot = { newBlocks: [] };
 	const tracker = createBlockTracker(512, update);
 
 	let initialized$ = new ReplaySubject<JSONRPCNotification>(1);
@@ -35,7 +36,8 @@ export function createStateManager() {
 		snapshot.initialized = undefined;
 		snapshot.finalized = undefined;
 		snapshot.runtime = undefined;
-		snapshot.events = [];
+		snapshot.bestBlockChanged = undefined;
+		snapshot.newBlocks = [];
 
 		tracker.known.clear();
 		tracker.flushPending();
@@ -50,6 +52,11 @@ export function createStateManager() {
 			return [];
 		}
 
+		const ordered = [
+			...snapshot.newBlocks,
+			...(snapshot.bestBlockChanged ? [snapshot.bestBlockChanged] : []),
+		];
+
 		const base = [
 			{
 				...snapshot.initialized,
@@ -58,7 +65,7 @@ export function createStateManager() {
 					subscription: upstreamSubId,
 				},
 			},
-			...snapshot.events.map((ev) => ({
+			...ordered.map((ev) => ({
 				...ev,
 				params: { ...ev.params, subscription: upstreamSubId },
 			})),
@@ -98,7 +105,13 @@ export function createStateManager() {
 				break;
 			}
 			case "newBlock": {
-				snapshot.events.push(msg);
+				snapshot.newBlocks.push(msg);
+				break;
+			}
+			case "bestBlockChanged": {
+				const hash = result.bestBlockHash;
+				if (hash) tracker.remember(hash);
+				snapshot.bestBlockChanged = msg;
 				break;
 			}
 			case "finalized": {
@@ -120,15 +133,22 @@ export function createStateManager() {
 						}
 					}
 
-					for (let i = snapshot.events.length - 1; i >= 0; i--) {
-						const ev = snapshot.events[i];
+					for (let i = snapshot.newBlocks.length - 1; i >= 0; i--) {
+						const ev = snapshot.newBlocks[i];
 						if (ev) {
 							const evHash = ev.params?.result?.blockHash;
 							const evParent = ev.params?.result?.parentBlockHash;
 							if (pruned.includes(evHash) || pruned.includes(evParent)) {
-								snapshot.events.splice(i, 1);
+								snapshot.newBlocks.splice(i, 1);
 							}
 						}
+					}
+				}
+
+				if (snapshot.bestBlockChanged) {
+					const best = snapshot.bestBlockChanged.params?.result?.bestBlockHash;
+					if (best === hash || pruned.includes(best)) {
+						snapshot.bestBlockChanged = undefined;
 					}
 				}
 
@@ -139,11 +159,11 @@ export function createStateManager() {
 				}
 
 				// Remove already-applied events up to finalized hash
-				const idx = snapshot.events.findIndex(
+				const idx = snapshot.newBlocks.findIndex(
 					(e) => e.params.result.blockHash === hash,
 				);
 				if (idx !== -1) {
-					snapshot.events.splice(0, idx + 1);
+					snapshot.newBlocks.splice(0, idx + 1);
 				}
 
 				tracker.remember(hash);
@@ -280,7 +300,7 @@ export function createStateManager() {
 		stats: () => {
 			return {
 				snapshot: {
-					events: snapshot.events.length,
+					events: snapshot.newBlocks.length,
 				},
 			};
 		},
