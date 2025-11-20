@@ -1,5 +1,6 @@
 import type { CacheConfig } from "@/config";
 import type { JSONRPCMethodHandler } from "../methods";
+import { archive_v1_storage, archive_v1_storageDiff } from "./archive/storage";
 import { chainHead_v1_body } from "./chain-head/body";
 import { chainHead_v1_call } from "./chain-head/call";
 import { chainHead_v1_follow } from "./chain-head/follow";
@@ -35,6 +36,9 @@ export function polkadotMethods(config: CacheConfig) {
 		chainHead_v1_stopOperation: opCacheEnabled
 			? ignoreRequest
 			: chainHead_v1_forward,
+
+		archive_v1_storage: archive_v1_storage(),
+		archive_v1_storageDiff: archive_v1_storageDiff(),
 
 		// Legacy subscriptions
 		chain_subscribeNewHead: subscribeLegacy("chain_unsubscribeNewHead"),
