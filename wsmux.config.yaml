@@ -40,10 +40,6 @@ rate_limit:
 # Upstream Servers Settings
 # -------------------------------------------------------------------
 upstream:
-  debug:
-    stats:
-      enabled: false
-      interval: 30s
   apex:
     - polkadot
   servers:
