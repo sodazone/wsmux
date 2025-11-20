@@ -6,7 +6,7 @@ import type { JSONRPCNotification, JSONRPCResponse } from "../../types";
 import { isSuccess } from "../../util";
 import { metrics } from "./metrics/storage.metrics";
 
-const logger = getLogger(["wsmux", "polkadot", "legacy", "subscribe"]);
+const logger = getLogger(["wsmux", "polkadot", "archive"]);
 
 const DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT = 50;
 
