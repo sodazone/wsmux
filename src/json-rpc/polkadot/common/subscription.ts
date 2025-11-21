@@ -4,7 +4,7 @@ import type { JSONRPCMethodHandler } from "@/json-rpc/methods";
 import { isSuccess } from "../../util";
 import { metrics } from "./metrics/subscription.metrics";
 
-export interface SubscriptionBehavior {
+interface SubscriptionBehavior {
 	getUpstreamId: (resp: any) => string;
 	mapId: (downstream: any, upstreamId: string) => string;
 	sendInitialResponse: (downstream: any, resp: any, localId: string) => void;
@@ -15,35 +15,40 @@ export interface SubscriptionBehavior {
 	onUnsubscribed?: (ctx: { upstream: any; req: any }) => void;
 }
 
-export interface SubscriptionQuota {
-	maxPerClient: number;
-	activeCounts: Map<number, number>;
+type SubscriptionQuota = ReturnType<typeof createSubscriptionQuota>;
+
+const DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT = 50;
+
+function createSubscriptionQuota(maxPerClient?: number) {
+	const _maxPerClient = maxPerClient ?? DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT;
+	const _activeCounts = new Map<number, number>();
+	return {
+		maxPerClient: _maxPerClient,
+		increment: (clientId: number) => {
+			_activeCounts.set(clientId, (_activeCounts.get(clientId) ?? 0) + 1);
+		},
+		decrement: (clientId: number) => {
+			const cur = _activeCounts.get(clientId) ?? 1;
+			const next = cur - 1;
+			next > 0
+				? _activeCounts.set(clientId, next)
+				: _activeCounts.delete(clientId);
+		},
+		hasReachedMax: (clientId: number) => {
+			return (_activeCounts.get(clientId) ?? 0) >= _maxPerClient;
+		},
+	};
 }
 
-export const createSubscriptionHandler = (
+const createSubscriptionHandler = (
 	behavior: SubscriptionBehavior,
 	quota: SubscriptionQuota,
 ): JSONRPCMethodHandler => {
-	const increment = (clientId: number) => {
-		quota.activeCounts.set(
-			clientId,
-			(quota.activeCounts.get(clientId) ?? 0) + 1,
-		);
-	};
-
-	const decrement = (clientId: number) => {
-		const cur = quota.activeCounts.get(clientId) ?? 1;
-		const next = cur - 1;
-		next > 0
-			? quota.activeCounts.set(clientId, next)
-			: quota.activeCounts.delete(clientId);
-	};
-
 	return {
 		handleRequest: async (upstream, downstream, req) => {
 			const { clientId } = downstream;
 
-			if ((quota.activeCounts.get(clientId) ?? 0) >= quota.maxPerClient) {
+			if (quota.hasReachedMax(clientId)) {
 				downstream.send({
 					jsonrpc: "2.0",
 					id: req.id ?? null,
@@ -68,7 +73,7 @@ export const createSubscriptionHandler = (
 
 			behavior.sendInitialResponse(downstream, resp, localId);
 
-			increment(clientId);
+			quota.increment(clientId);
 
 			behavior.onSubscribed?.({ upstream, req });
 			metrics.subscribe(upstream.url, req.method);
@@ -97,7 +102,7 @@ export const createSubscriptionHandler = (
 				try {
 					sub.unsubscribe();
 				} catch {}
-				decrement(clientId);
+				quota.decrement(clientId);
 				behavior.onUnsubscribed?.({ upstream, req });
 				metrics.unsubscribe(upstream.url, req.method);
 			};
@@ -108,7 +113,7 @@ export const createSubscriptionHandler = (
 	};
 };
 
-export const defaultBehavior = (
+const defaultBehavior = (
 	eventName: string,
 	terminalEvents: Set<string>,
 ): SubscriptionBehavior => ({
@@ -129,17 +134,12 @@ export const defaultBehavior = (
 	}),
 });
 
-const DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT = 50;
-
 export function createDefaultSubscriptionHandler(
 	eventName: string,
 	terminalEvents: Set<string>,
 	maxPerClient?: number,
 ): JSONRPCMethodHandler {
-	const quota = {
-		maxPerClient: maxPerClient ?? DEFAULT_MAX_SUBSCRIPTIONS_PER_CLIENT,
-		activeCounts: new Map(),
-	};
+	const quota = createSubscriptionQuota(maxPerClient);
 
 	return createSubscriptionHandler(
 		defaultBehavior(eventName, terminalEvents),
