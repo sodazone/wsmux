@@ -15,6 +15,7 @@ import { ignoreRequest } from "./ignore";
 import { subscribeLegacy } from "./legacy/subscribe";
 import { unsubscribeLegacy } from "./legacy/unsubscribe";
 import { rpc_methods } from "./rpc-methods";
+import { transactionWatch_v1_submitAndWatch } from "./transaction/watch";
 
 export function polkadotMethods(config: CacheConfig) {
 	const opCacheEnabled = isCacheEnabled(config);
@@ -39,6 +40,8 @@ export function polkadotMethods(config: CacheConfig) {
 
 		archive_v1_storage: archive_v1_storage(),
 		archive_v1_storageDiff: archive_v1_storageDiff(),
+
+		transactionWatch_v1_submitAndWatch: transactionWatch_v1_submitAndWatch(),
 
 		// Legacy subscriptions
 		chain_subscribeNewHead: subscribeLegacy("chain_unsubscribeNewHead"),
