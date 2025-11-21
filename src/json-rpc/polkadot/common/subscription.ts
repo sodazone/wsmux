@@ -4,16 +4,11 @@ import type { JSONRPCMethodHandler } from "@/json-rpc/methods";
 import { isSuccess } from "../../util";
 import { metrics } from "./metrics/subscription.metrics";
 
-interface SubscriptionBehavior {
-	getUpstreamId: (resp: any) => string;
-	mapId: (downstream: any, upstreamId: string) => string;
-	sendInitialResponse: (downstream: any, resp: any, localId: string) => void;
+type SubscriptionBehavior = {
 	matchEvent: (msg: any, upstreamId: string) => boolean;
 	isTerminal: (msg: any) => boolean;
 	rewriteEvent: (msg: any, localId: string) => any;
-	onSubscribed?: (ctx: { upstream: any; req: any }) => void;
-	onUnsubscribed?: (ctx: { upstream: any; req: any }) => void;
-}
+};
 
 type SubscriptionQuota = ReturnType<typeof createSubscriptionQuota>;
 
@@ -68,14 +63,14 @@ const createSubscriptionHandler = (
 				return;
 			}
 
-			const upstreamId = behavior.getUpstreamId(resp);
-			const localId = behavior.mapId(downstream, upstreamId);
+			const upstreamId = resp.result;
+			const localId = downstream.getLocalId(upstreamId);
 
-			behavior.sendInitialResponse(downstream, resp, localId);
+			// Send initial response with local ID
+			downstream.send({ ...resp, result: localId });
 
 			quota.increment(clientId);
 
-			behavior.onSubscribed?.({ upstream, req });
 			metrics.subscribe(upstream.url, req.method);
 
 			let done = false;
@@ -103,7 +98,6 @@ const createSubscriptionHandler = (
 					sub.unsubscribe();
 				} catch {}
 				quota.decrement(clientId);
-				behavior.onUnsubscribed?.({ upstream, req });
 				metrics.unsubscribe(upstream.url, req.method);
 			};
 
@@ -117,11 +111,6 @@ const defaultBehavior = (
 	eventName: string,
 	terminalEvents: Set<string>,
 ): SubscriptionBehavior => ({
-	getUpstreamId: (resp) => resp.result,
-	mapId: (downstream, upstreamId) => downstream.getLocalId(upstreamId),
-	sendInitialResponse: (downstream, resp, localId) => {
-		downstream.send({ ...resp, result: localId });
-	},
 	matchEvent: (msg, upstreamId) =>
 		!("id" in msg) && msg.params?.subscription === upstreamId,
 	isTerminal: (msg) =>
