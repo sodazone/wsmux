@@ -125,13 +125,13 @@ const defaultBehavior = (
 
 export function createDefaultSubscriptionHandler(
 	eventName: string,
-	terminalEvents: Set<string>,
+	terminalEvents: string[],
 	maxPerClient?: number,
 ): JSONRPCMethodHandler {
 	const quota = createSubscriptionQuota(maxPerClient);
 
 	return createSubscriptionHandler(
-		defaultBehavior(eventName, terminalEvents),
+		defaultBehavior(eventName, new Set(terminalEvents)),
 		quota,
 	);
 }
