@@ -281,6 +281,12 @@ function _createSharedSubscription(
 				//
 			}
 
+			try {
+				onLocalUnsubscribe(localId);
+			} catch {
+				//
+			}
+
 			localSubs.delete(localId);
 
 			try {
