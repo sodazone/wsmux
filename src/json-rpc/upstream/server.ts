@@ -257,8 +257,9 @@ export function createUpstreamServer({
 		},
 
 		removeUnsubscriber(localId: string) {
-			logger.info(`[${localId}] remove unsubscriber (${unsubscribers.size})`);
-			unsubscribers.delete(localId);
+			if (unsubscribers.delete(localId)) {
+				logger.info(`[${localId}] remove unsubscriber (${unsubscribers.size})`);
+			}
 		},
 
 		stats() {
