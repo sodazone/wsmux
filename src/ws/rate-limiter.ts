@@ -66,13 +66,7 @@ export const rateLimiterMiddleware = (
 			return true;
 		}
 
-		try {
-			bucket.allow();
-		} catch {
-			return false;
-		}
-
-		return true;
+		return bucket.allow();
 	}
 
 	return {
