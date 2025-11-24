@@ -16,7 +16,7 @@ import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
 const DEFAULT_MAX_FOLLOWS_PER_UPSTREAM = 2;
-const DEFAULT_MAX_WAITERS = 5;
+const DEFAULT_MAX_WAITERS = 100;
 
 const logger = getLogger(["wsmux", "chainhead", "follow"]);
 
@@ -24,6 +24,7 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 	const methodKey = "chainHead_v1_follow";
 
 	const getOrCreateFollow = createConcurrentCreator({
+		// TODO: make this configurable
 		maxWaiting: DEFAULT_MAX_WAITERS,
 		label: methodKey,
 	});
@@ -160,6 +161,9 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					err instanceof RateLimitedError ||
 					err instanceof TooManyWaitersError
 				) {
+					logger.debug((l) => l`[${upstreamId}: ${err.message}`);
+
+					// TODO: is this error the proper way to handle it?
 					downstream.send(
 						jsonRpcError({
 							message: err.message,
