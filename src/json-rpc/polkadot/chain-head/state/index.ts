@@ -38,16 +38,25 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 					(l) =>
 						l`[${upstreamSubId}] ${aborted ? "clean up" : "unfollow"} upstream`,
 				);
-				if (!aborted) {
-					await upstream.request({
-						jsonrpc: "2.0",
-						method: "chainHead_v1_unfollow",
-						params: [upstreamSubId],
-					});
-				}
+
 				pool.release(followKey);
 				stateManagers.delete(followKey);
 				onUnfollow(upstreamSubId);
+
+				if (!aborted) {
+					try {
+						await upstream.request({
+							jsonrpc: "2.0",
+							method: "chainHead_v1_unfollow",
+							params: [upstreamSubId],
+						});
+					} catch (error) {
+						logger.error(
+							"[{upstreamSubId}] Error while unfollowing upstream {error}",
+							{ error, upstreamSubId },
+						);
+					}
+				}
 			};
 			return observeSharedSubscription(
 				followKey,
@@ -56,10 +65,8 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 					followKey,
 					upstreamSubId,
 					stateManager.withUpdater(upstreamSubId, upstream, () => {
-						// we send up the unfollow, seemingly some RPCs expect that
-						// after stopping
-						void cleanup(false);
-						logger.info`cleanup ${followKey} from pool`;
+						void cleanup(true);
+						logger.info`[${followKey}] cleanup from pool`;
 					}),
 					cleanup,
 					(localId: string) => {
