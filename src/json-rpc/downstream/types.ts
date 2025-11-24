@@ -16,7 +16,6 @@ export type DownstreamClient = {
 	closed: boolean;
 	startRequest(): void;
 	endRequest(): void;
-	requestsInPeriod(millis?: number): number;
 	getLocalId(suffix: string): string;
 	send(message: DownstreamMessage): number;
 	close(code?: number, reason?: string): void;

@@ -1,11 +1,10 @@
 import { getLogger } from "@logtape/logtape";
 
+import { createTokenBucket, type TokenBucket } from "@/util/token-bucket";
 import type { ProxyRateLimitConfig } from "../config";
 import type { JSONRPCContextData } from "../json-rpc";
 import { createTrustedIPs } from "../util/net/trusted-ip";
 import type { WebSocketMiddleware } from "./handler";
-
-const DEFAULT_FLUSH_INTERVAL = 60_000; // 60s
 
 const logger = getLogger(["wsmux", "rate-limiter"]);
 
@@ -23,7 +22,7 @@ export const rateLimiterMiddleware = (
 
 	const { windowMs, maxRequests, trustedNetworks } = config;
 	const trustedProxies = createTrustedIPs(trustedNetworks);
-	const ipBuckets = new Map<string, { count: number; reset: number }>();
+	const ipBuckets = new Map<string, TokenBucket>();
 
 	function getClientIp(ws: Bun.ServerWebSocket<JSONRPCContextData>): string {
 		const remoteAddress = ws.remoteAddress || "unknown";
@@ -60,25 +59,21 @@ export const rateLimiterMiddleware = (
 	}
 
 	function checkLimit(ip: string): boolean {
-		const now = performance.now();
 		const bucket = ipBuckets.get(ip);
 
-		if (!bucket || now > bucket.reset) {
-			ipBuckets.set(ip, { count: 1, reset: now + windowMs });
+		if (!bucket) {
+			ipBuckets.set(ip, createTokenBucket(maxRequests, windowMs));
 			return true;
 		}
 
-		if (bucket.count >= maxRequests) return false;
-		bucket.count++;
+		try {
+			bucket.allow();
+		} catch {
+			return false;
+		}
+
 		return true;
 	}
-
-	setInterval(() => {
-		const now = performance.now();
-		for (const [ip, bucket] of ipBuckets) {
-			if (now > bucket.reset) ipBuckets.delete(ip);
-		}
-	}, DEFAULT_FLUSH_INTERVAL).unref();
 
 	return {
 		async open({ ws }, next) {
@@ -86,7 +81,7 @@ export const rateLimiterMiddleware = (
 			if (checkLimit(ip)) {
 				next();
 			} else {
-				ws.close(1013, "Rate limit exceeded");
+				ws.terminate();
 			}
 		},
 	};

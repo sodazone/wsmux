@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { ServerWebSocket } from "bun";
-
+import { createTokenBucket } from "@/util/token-bucket";
 import type { JSONRPCContextData } from "../types";
 import type { DownstreamClient, DownstreamMessage } from "./types";
 
@@ -17,9 +17,10 @@ const nextId = (() => {
 
 export function createDownstream(
 	ws: ServerWebSocket<JSONRPCContextData>,
+	rate: { capacity: number; windowMs: number },
 ): DownstreamClient {
 	const closeFns = new Set<() => void>();
-	let lastRequestTimes: number[] = [];
+	const _rateLimiter = createTokenBucket(rate.capacity, rate.windowMs);
 	let _pendingRequests = 0;
 
 	return {
@@ -31,19 +32,13 @@ export function createDownstream(
 			return ws.readyState > 1;
 		},
 		startRequest() {
-			_pendingRequests++;
-			lastRequestTimes.push(Date.now());
-			if (lastRequestTimes.length > 10_000) {
-				lastRequestTimes.shift();
+			if (!_rateLimiter.allow()) {
+				throw new Error("Rate limit exceeded");
 			}
+			_pendingRequests++;
 		},
 		endRequest() {
 			_pendingRequests--;
-		},
-		requestsInPeriod(millis = 1_000) {
-			const now = Date.now();
-			lastRequestTimes = lastRequestTimes.filter((t) => now - t < millis);
-			return lastRequestTimes.length;
 		},
 		getLocalId(suffix: string): string {
 			return `${this.clientId}-${suffix}`;

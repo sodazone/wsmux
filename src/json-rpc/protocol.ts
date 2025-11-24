@@ -28,7 +28,10 @@ export function jsonRpcMiddleware(
 
 	return {
 		open: async (ctx, next) => {
-			ctx.ws.data.client = createDownstream(ctx.ws);
+			ctx.ws.data.client = createDownstream(ctx.ws, {
+				capacity: max_requests_per_second,
+				windowMs: 1_000,
+			});
 			await next();
 		},
 
@@ -63,20 +66,21 @@ export function jsonRpcMiddleware(
 				return;
 			}
 
-			if (client.requestsInPeriod(1_000) >= max_requests_per_second) {
-				ctx.ws.close(1013, "JSON-RPC Rate limit exceeded");
-				return;
-			}
-
 			if (
 				client.pendingRequests >= max_pending_requests_per_connection ||
 				globalPending >= max_pending_requests
 			) {
-				ctx.ws.close(1013, "JSON-RPC Too many concurrent requests");
+				ctx.ws.terminate();
 				return;
 			}
 
-			client.startRequest();
+			try {
+				client.startRequest();
+			} catch {
+				ctx.ws.terminate();
+				return;
+			}
+
 			globalPending++;
 
 			try {
