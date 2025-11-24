@@ -163,7 +163,11 @@ export function createUpstreamServer({
 			const upstreamId = server.nextId();
 			const ws = connection$.value;
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
-				throw new Error("Upstream not connected");
+				return {
+					jsonrpc: "2.0",
+					id: req.id ?? null,
+					error: { code: -32000, message: "Upstream not connected" },
+				};
 			}
 
 			const resp$ = message$.pipe(
@@ -184,7 +188,6 @@ export function createUpstreamServer({
 					);
 
 					unhealthy = true;
-					connection$.value?.close(4001, "Request timeout");
 
 					return of({
 						jsonrpc: "2.0",
