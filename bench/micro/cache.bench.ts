@@ -1,4 +1,4 @@
-import { bench, do_not_optimize, run, summary } from "mitata";
+import { bench, run, summary } from "mitata";
 import { type Cache, createLRUCache } from "@/util/cache";
 import { createFIFOCache } from "./baselines/fifo";
 
@@ -15,7 +15,7 @@ summary(() => {
 				},
 				bench(cache: Cache<number>) {
 					for (let i = 0; i < maxSize * 10; i++) cache.set(String(i), i);
-					return do_not_optimize(cache.size);
+					return cache.size;
 				},
 			};
 		});
@@ -27,7 +27,7 @@ summary(() => {
 				},
 				bench(cache: Cache<number>) {
 					for (let i = 0; i < maxSize * 10; i++) cache.set(String(i), i);
-					return do_not_optimize(cache.size);
+					return cache.size;
 				},
 			};
 		});
@@ -54,7 +54,7 @@ summary(() => {
 						const val = cache.get(key);
 						if (val !== undefined) sum += val;
 					}
-					return do_not_optimize(sum);
+					return sum;
 				},
 			};
 		});
@@ -77,7 +77,7 @@ summary(() => {
 						const val = cache.get(key);
 						if (val !== undefined) sum += val;
 					}
-					return do_not_optimize(sum);
+					return sum;
 				},
 			};
 		});
@@ -102,7 +102,7 @@ summary(() => {
 					for (const key of keys) {
 						cache.remove(key);
 					}
-					return do_not_optimize(cache.size);
+					return cache.size;
 				},
 			};
 		});
@@ -123,7 +123,7 @@ summary(() => {
 					for (const key of keys) {
 						cache.remove(key);
 					}
-					return do_not_optimize(cache.size);
+					return cache.size;
 				},
 			};
 		});
