@@ -79,6 +79,7 @@ export function createUpstreamServer({
 
 		logger.info`[${url}] connecting...`;
 		const ws = new WebSocket(url);
+		ws.binaryType = "arraybuffer";
 
 		ws.onopen = () => {
 			logger.info`[${url}] connected ok`;
@@ -87,7 +88,9 @@ export function createUpstreamServer({
 			connection$.next(ws);
 		};
 
-		ws.onmessage = ({ data }) => handleMessage(data.toString());
+		ws.onmessage = ({ data }) => {
+			queueMicrotask(() => handleMessage(data.toString()));
+		};
 
 		ws.onclose = (event) => {
 			connection$.next(null);
