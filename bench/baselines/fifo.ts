@@ -1,12 +1,6 @@
-export type Cache<T> = {
-	get(key: string): T | undefined;
-	set(key: string, value: T): void;
-	remove(key: string): void;
-	size: number;
-	clear(): void;
-};
+import type { Cache } from "@/util/cache/types";
 
-export function createCache<T>(maxSize = 1_000): Cache<T> {
+export function createFIFOCache<T>(maxSize = 1_000): Cache<T> {
 	const cache = new Map<string, T>();
 	const queue: string[] = [];
 

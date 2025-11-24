@@ -1,6 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 import type { CacheConfig } from "@/config";
-import { createCache } from "@/util/cache";
+import { createLRUCache } from "@/util/cache";
 import type { JSONRPCMethodHandler } from "../../methods";
 import type { JSONRPCRequest, JSONRPCResponse } from "../../types";
 import { isSuccess } from "../../util";
@@ -14,7 +14,7 @@ export const chainHead_v1_header = (
 	config: CacheConfig,
 ): JSONRPCMethodHandler => {
 	if (isCacheEnabledFor(config, "chainHead_v1_header")) {
-		const cache = createCache<JSONRPCResponse>(
+		const cache = createLRUCache<JSONRPCResponse>(
 			config.methods?.chainHead_v1_header?.maxSize ?? 100,
 		);
 		const keyOf: (req: JSONRPCRequest) => string = (req) => req.params[1];

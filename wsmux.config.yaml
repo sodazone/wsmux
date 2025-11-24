@@ -47,8 +47,8 @@ upstream:
     #  url: wss://polkadot-asset-hub-rpc.polkadot.io
     #  #url: ws://localhost:9945
     #  presets: polkadot_legacy
-    #- name: chaos
-    #  url: ws://localhost:9944
+    - name: chaos
+      url: ws://localhost:9944
     #  request_timeout: 5s
     #  connection_timeout: 10s
     #  max_connections: 100

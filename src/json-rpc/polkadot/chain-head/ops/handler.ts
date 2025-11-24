@@ -9,7 +9,7 @@ import type {
 	JSONRPCResponse,
 } from "@/json-rpc/types";
 import { isSuccess } from "@/json-rpc/util";
-import { createCache } from "@/util/cache";
+import { createLRUCache } from "@/util/cache";
 import { forwardChainHeadHandler } from "../forward";
 import { chainHeadCacheMetrics } from "../metrics/cache.metrics";
 import { isCacheEnabledFor, isStarted } from "./util";
@@ -128,7 +128,7 @@ const forwardWithCacheHandler = ({
 	terminalEvents: string[];
 	keyOf: (r: JSONRPCRequest) => string;
 }): JSONRPCMethodHandler => {
-	const cache = createCache<CacheEntry>(maxSize);
+	const cache = createLRUCache<CacheEntry>(maxSize);
 	const terminus = new Set([...FLUSH_CACHE_EVENTS, ...terminalEvents]);
 
 	return forwardChainHeadHandler({
