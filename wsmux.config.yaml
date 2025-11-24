@@ -5,7 +5,7 @@ log_level: info
 # -------------------------------------------------------------------
 cache:
   # Global cache toggle. When disabled, *all* methods bypass cache.
-  enabled: true
+  enabled: false
 
   # Cache settings for each method.
   methods:
@@ -45,8 +45,8 @@ upstream:
     #  url: wss://polkadot-asset-hub-rpc.polkadot.io
     #  #url: ws://localhost:9945
     #  presets: polkadot_legacy
-    - name: chaos
-      url: ws://localhost:9944
+    #- name: chaos
+    #  url: ws://localhost:9944
     #  request_timeout: 5s
     #  connection_timeout: 10s
     #  max_connections: 100
@@ -59,6 +59,12 @@ upstream:
           max_subscribers: 4
     - name: helix
       url: wss://rpc-polkadot.helixstreet.io
+      presets: polkadot
+      methods:
+        chainHead_v1_follow:
+          max_subscribers: 4
+    - name: lucky
+      url: wss://rpc-polkadot.luckyfriday.io
       presets: polkadot
       methods:
         chainHead_v1_follow:
