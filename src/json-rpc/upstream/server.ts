@@ -33,6 +33,7 @@ export function createUpstreamServer({
 	maxConnections = DEFAULT_MAX_CONNECTIONS,
 	retryDelay = DEFAULT_RETRY_DELAY_MS,
 }: UpstreamServerConfig): UpstreamServer {
+	const decoder = new TextDecoder();
 	const connection$ = new BehaviorSubject<WebSocket | null>(null);
 	const unsubscribers = new Map<string, () => void>();
 	const states = new Map<string, unknown>();
@@ -89,7 +90,9 @@ export function createUpstreamServer({
 		};
 
 		ws.onmessage = ({ data }) => {
-			queueMicrotask(() => handleMessage(data.toString()));
+			queueMicrotask(() =>
+				handleMessage(typeof data === "string" ? data : decoder.decode(data)),
+			);
 		};
 
 		ws.onclose = (event) => {
