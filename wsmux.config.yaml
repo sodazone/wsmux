@@ -40,8 +40,6 @@ rate_limit:
 # Upstream Servers Settings
 # -------------------------------------------------------------------
 upstream:
-  apex:
-    - polkadot
   servers:
     #- name: subway
     #  url: wss://polkadot-asset-hub-rpc.polkadot.io
