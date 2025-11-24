@@ -57,7 +57,11 @@ const forwardHandler = ({
 	return forwardChainHeadHandler({
 		afterResponse: (req, res, { upstream, upstreamSubId, downstream }) => {
 			if (!isSuccess(res)) {
-				logger.error(`Error response for ${req.id}`);
+				logger.error("Error response for {id} {method}: {res}", {
+					id: req.id,
+					method: req.method,
+					res,
+				});
 				return;
 			}
 
@@ -202,7 +206,11 @@ const forwardWithCacheHandler = ({
 			const localId = req.params[0];
 
 			if (!isSuccess(res)) {
-				logger.error(`Error response for ${keyOf(req)}`);
+				logger.error("Error response for {key} {method}: {res}", {
+					key: keyOf(req),
+					method: req.method,
+					res,
+				});
 				return;
 			}
 

@@ -44,7 +44,11 @@ export const chainHead_v1_header = (
 						);
 					}
 				} else {
-					logger.error(`Error response for ${keyOf(req)}`);
+					logger.error("Error response for {key} {method}: {res}", {
+						key: keyOf(req),
+						method: req.method,
+						res,
+					});
 				}
 			},
 		});
