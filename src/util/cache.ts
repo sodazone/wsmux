@@ -8,7 +8,7 @@ export type Cache<T> = {
 
 export function createCache<T>(maxSize = 1_000): Cache<T> {
 	const cache = new Map<string, T>();
-	let _size = 0;
+	const queue: string[] = [];
 
 	return {
 		get(key: string): T | undefined {
@@ -16,33 +16,31 @@ export function createCache<T>(maxSize = 1_000): Cache<T> {
 		},
 
 		get size(): number {
-			return _size;
+			return cache.size;
 		},
 
 		set(key: string, value: T): void {
-			if (cache.has(key)) {
-				cache.set(key, value);
-			} else {
-				cache.set(key, value);
-				_size++;
-				if (_size > maxSize) {
-					const oldestKey = cache.keys().next().value;
+			if (!cache.has(key)) {
+				queue.push(key);
+				if (cache.size >= maxSize) {
+					const oldestKey = queue.shift();
 					if (oldestKey !== undefined) cache.delete(oldestKey);
-					_size--;
 				}
 			}
+			cache.set(key, value);
 		},
 
 		remove(key: string): void {
 			if (cache.has(key)) {
 				cache.delete(key);
-				_size--;
+				const index = queue.indexOf(key);
+				if (index !== -1) queue.splice(index, 1);
 			}
 		},
 
 		clear(): void {
 			cache.clear();
-			_size = 0;
+			queue.length = 0;
 		},
 	};
 }
