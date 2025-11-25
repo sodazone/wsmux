@@ -16,7 +16,7 @@ import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
 const DEFAULT_MAX_FOLLOWS_PER_UPSTREAM = 2;
-const DEFAULT_MAX_WAITERS = 100;
+const DEFAULT_MAX_WAITERS = 1_500;
 
 const logger = getLogger(["wsmux", "chainhead", "follow"]);
 

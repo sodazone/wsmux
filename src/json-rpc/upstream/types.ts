@@ -38,7 +38,16 @@ export type SharedSubscriptionGroup = ReturnType<
 	typeof createSharedSubscriptionGroup
 >;
 
+type UpstreamServerStats = {
+	states: Record<string, any>;
+	subscriptions: Record<string, any>;
+	unsubscribers: number;
+	messageSubscribers: number;
+	connections: number;
+};
+
 export type UpstreamServer = {
+	id: string;
 	url: string;
 	nextId(): number;
 	subscriptions: SharedSubscriptionGroup;
@@ -59,37 +68,49 @@ export type UpstreamServer = {
 		inc(): void;
 		dec(): void;
 	};
+	connectionsCount: number;
 	waitForReady(timeout?: number): Promise<unknown>;
 	connect(): Promise<void>;
 	stop(): void;
 	getOrCreateState<T>(id: string, factory: () => T): T;
-	stats(): {
-		states: Record<string, any>;
-		subscriptions: Record<string, any>;
-		unsubscribers: number;
-		messageSubscribers: number;
-		connections: number;
-	};
+	stats(): UpstreamServerStats;
 };
 
 export type UpstreamServerConfig = {
 	name: string;
 	url: string;
+	maxClientsPerConnection?: number;
+	maxConnections?: number;
+	minConnections?: number;
+	idleCloseMs?: number;
 	requestTimeout?: number;
 	connectionTimeout?: number;
-	maxConnections?: number;
 	supportedMethods?: Set<string>;
 	retryDelay?: number;
 	methods?: Record<string, any>;
 };
 
+export type UpstreamServerPool = {
+	release(server: UpstreamServer): void;
+	start(): UpstreamServer[];
+	acquire(): UpstreamServer | undefined;
+	supportsMethod(method: string): boolean;
+	stop(): void;
+	stats(): UpstreamServerStats[];
+};
+
+export type UpstreamServerAndPool = {
+	server: UpstreamServer;
+	pool: UpstreamServerPool;
+};
+
 export type UpstreamRegistry = {
-	servers: UpstreamServer[];
+	pools: UpstreamServerPool[];
 	resolveApexMethod: (method: string) => JSONRPCApexMethodHandler | undefined;
 	resolveUpstream: (
 		ctx: JSONRPCContextData,
 		method: string,
-	) => UpstreamServer | undefined;
+	) => UpstreamServerAndPool | undefined;
 	disconnect: (clientId: number) => void;
 	destroy: () => void;
 	connectAll: () => Promise<void>;

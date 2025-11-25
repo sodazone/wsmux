@@ -1,4 +1,5 @@
 import { getLogger } from "@logtape/logtape";
+import { randomUUIDv7 } from "bun";
 import { BehaviorSubject, firstValueFrom, of, Subject } from "rxjs";
 import { catchError, filter, map, take, timeout } from "rxjs/operators";
 
@@ -15,7 +16,7 @@ import type { UpstreamServer, UpstreamServerConfig } from "./types";
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRY_DELAY_MS = 2_000;
-const DEFAULT_MAX_CONNECTIONS = 200;
+const DEFAULT_MAX_CLIENTS_PER_CONNECTION = 15;
 const MAX_BACKOFF_MS = 10 * 60 * 1_000;
 
 const logger = getLogger(["wsmux", "upstream", "server"]);
@@ -30,9 +31,10 @@ export function createUpstreamServer({
 	methods,
 	requestTimeout = DEFAULT_REQUEST_TIMEOUT_MS,
 	connectionTimeout = DEFAULT_CONNECTION_TIMEOUT_MS,
-	maxConnections = DEFAULT_MAX_CONNECTIONS,
+	maxClientsPerConnection = DEFAULT_MAX_CLIENTS_PER_CONNECTION,
 	retryDelay = DEFAULT_RETRY_DELAY_MS,
 }: UpstreamServerConfig): UpstreamServer {
+	const id = randomUUIDv7();
 	const decoder = new TextDecoder();
 	const connection$ = new BehaviorSubject<WebSocket | null>(null);
 	const unsubscribers = new Map<string, () => void>();
@@ -44,7 +46,7 @@ export function createUpstreamServer({
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	let unhealthy = false;
 	let currentBackoff = retryDelay;
-	let _connections = 0;
+	let _clients = 0;
 	let _nextId = 0;
 
 	function cleanup() {
@@ -60,7 +62,7 @@ export function createUpstreamServer({
 		unsubscribers.clear();
 		states.clear();
 		subscriptions.abort();
-		_connections = 0;
+		_clients = 0;
 	}
 
 	function scheduleReconnect() {
@@ -78,12 +80,12 @@ export function createUpstreamServer({
 	async function connect() {
 		if (stopped) return;
 
-		logger.info`[${url}] connecting...`;
+		logger.info`[${url}:${id}] connecting...`;
 		const ws = new WebSocket(url);
 		ws.binaryType = "arraybuffer";
 
 		ws.onopen = () => {
-			logger.info`[${url}] connected ok`;
+			logger.info`[${url}:${id}] connected ok`;
 			unhealthy = false;
 			currentBackoff = retryDelay;
 			connection$.next(ws);
@@ -97,7 +99,7 @@ export function createUpstreamServer({
 
 		ws.onclose = (event) => {
 			connection$.next(null);
-			logger.info`[${url}] disconnected (${event.code})`;
+			logger.info`[${url}:${id}] disconnected (${event.code})`;
 
 			if (stopped) {
 				message$.complete();
@@ -108,20 +110,21 @@ export function createUpstreamServer({
 		};
 
 		ws.onerror = (err) => {
-			logger.error("[{url}] websocket error", { url, err });
+			logger.error("[{url}:{id}] websocket error", { url, id, err });
 		};
 	}
 
 	const connections = {
 		inc() {
-			_connections++;
+			_clients++;
 		},
 		dec() {
-			_connections = Math.max(0, _connections - 1);
+			_clients = Math.max(0, _clients - 1);
 		},
 	};
 
 	const server: UpstreamServer = {
+		id,
 		url,
 		nextId() {
 			return _nextId++;
@@ -143,7 +146,7 @@ export function createUpstreamServer({
 		},
 
 		hasCapacity: () => {
-			return _connections < maxConnections;
+			return _clients < maxClientsPerConnection;
 		},
 
 		connections,
@@ -232,7 +235,7 @@ export function createUpstreamServer({
 		},
 
 		async stop() {
-			logger.info`stopping upstream ${url}`;
+			logger.info`[${url}:${id}] stopping upstream`;
 
 			stopped = true;
 			cleanup();
@@ -271,12 +274,16 @@ export function createUpstreamServer({
 			}
 		},
 
+		get connectionsCount() {
+			return _clients;
+		},
+
 		stats() {
 			return {
 				states: collectStats(states),
 				unsubscribers: unsubscribers.size,
 				messageSubscribers: (message$ as any).observers?.length ?? 0,
-				connections: _connections,
+				connections: _clients,
 				subscriptions: subscriptions.stats(),
 			};
 		},
@@ -287,7 +294,7 @@ export function createUpstreamServer({
 			const msg = JSON.parse(data) as JSONRPCResponse | JSONRPCNotification;
 			message$.next(msg);
 		} catch (err) {
-			logger.error("[{url}] JSON parse error", { url, err });
+			logger.error("[{url}:{id}] JSON parse error", { url, id, err });
 		}
 	}
 

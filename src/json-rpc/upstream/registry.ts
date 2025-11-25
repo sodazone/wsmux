@@ -4,41 +4,40 @@ import type { UpstreamConfig } from "../../config";
 import type { JSONRPCApexMethodHandler } from "../methods";
 import { resolveRoutingPreset } from "../presets/routing";
 import type { JSONRPCContextData } from "../types";
-import { createUpstreamServer } from "./server";
-import { startServerStats } from "./stats";
-import type { UpstreamRegistry, UpstreamServer } from "./types";
+import { createUpstreamPool } from "./pool";
+import type { UpstreamRegistry, UpstreamServerAndPool } from "./types";
 
 const logger = getLogger(["wsmux", "upstream", "registry"]);
 
 export function createUpstreamRegistry(
 	config: UpstreamConfig,
 ): UpstreamRegistry {
-	const servers = config.servers.map(createUpstreamServer);
-	const clientUpstream = new Map<number, UpstreamServer>();
+	const pools = config.servers.map(createUpstreamPool);
+	const clientUpstream = new Map<number, UpstreamServerAndPool>();
 	const apex = Object.fromEntries(
 		config.apex
 			.map(resolveRoutingPreset)
 			.flatMap((record) => Object.entries(record)),
 	);
 
-	logger.info(`#servers=${servers.length}, apex=${config.apex}`);
+	logger.info`#upstreamPools=${pools.length}`;
 
-	let lastIndex = -1;
+	// Just round-robin
+	let lastPoolIndex = -1;
 
-	if (config.debug.stats.enabled) {
-		startServerStats(servers, config.debug.stats);
-	}
+	const pickServer = (method: string): UpstreamServerAndPool | undefined => {
+		const candidates = pools.filter((p) => p.supportsMethod(method));
+		if (candidates.length === 0) return;
 
-	const pickServer = (method: string): UpstreamServer | undefined => {
-		const candidates = servers.filter(
-			(s) =>
-				s.isReady() &&
-				s.hasCapacity() &&
-				(s.supportedMethods === undefined || s.supportedMethods.has(method)),
-		);
-		if (candidates.length === 0) return undefined;
-		lastIndex = (lastIndex + 1) % candidates.length;
-		return candidates[lastIndex];
+		lastPoolIndex = (lastPoolIndex + 1) % candidates.length;
+		const pool = candidates[lastPoolIndex];
+
+		if (pool) {
+			const server = pool.acquire();
+			if (!server) return undefined;
+
+			return { pool, server };
+		}
 	};
 
 	const resolveApexMethod = (
@@ -60,52 +59,56 @@ export function createUpstreamRegistry(
 		}
 
 		if (clientUpstream.has(clientId)) {
-			const server = clientUpstream.get(clientId)!;
-			if (server.isReady()) return server;
+			const { pool, server } = clientUpstream.get(clientId)!;
+			if (server.isReady()) return { pool, server };
 
 			clientUpstream.delete(clientId);
-			server.connections.dec();
+			pool.release(server);
 		}
 
-		const server = pickServer(method);
-		if (server === undefined) return undefined;
+		const poolAndServer = pickServer(method);
+		if (poolAndServer === undefined) return undefined;
 
-		clientUpstream.set(clientId, server);
-		server.connections.inc();
+		clientUpstream.set(clientId, poolAndServer);
 
-		return server;
+		return poolAndServer;
 	};
 
 	return {
-		servers,
+		pools,
 		resolveApexMethod,
 		resolveUpstream,
 		disconnect: (clientId: number) => {
-			const server = clientUpstream.get(clientId);
-			if (server) {
-				server.connections.dec();
+			const serverAndPool = clientUpstream.get(clientId);
+			if (serverAndPool) {
+				const { pool, server } = serverAndPool;
+				pool.release(server);
 			}
 			clientUpstream.delete(clientId);
 		},
 		connectAll: async () => {
 			await Promise.all(
-				servers.map(async (server) => {
-					await server.connect();
-					try {
-						await server.waitForReady();
-					} catch (err: any) {
-						if (err.name === "TimeoutError") {
-							logger.warn(`Timeout waiting for ready: ${server.url}`);
-						} else {
-							throw err;
-						}
+				pools.map(async (pool) => {
+					const conns = pool.start();
+					if (!conns) {
+						logger.warn("Cannot acquire server connection from pool");
+						return;
 					}
+
+					const results = await Promise.allSettled(
+						conns.map((conn) => conn.waitForReady()),
+					);
+					results.forEach((result) => {
+						if (result.status === "rejected") {
+							logger.warn(`Failed to connect to server: ${result.reason}`);
+						}
+					});
 				}),
 			);
 		},
 		destroy: () => {
-			servers.forEach((server) => {
-				server.stop();
+			pools.forEach((pool) => {
+				pool.stop();
 			});
 		},
 	};

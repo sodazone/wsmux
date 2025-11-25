@@ -94,7 +94,12 @@ export function jsonRpcMiddleware(
 						return;
 					}
 
-					await handleRPCMethod(client, upstream, req, methodHandlers);
+					const { server } = upstream;
+					if (!server.isReady()) {
+						await server.waitForReady();
+					}
+
+					await handleRPCMethod(client, server, req, methodHandlers);
 				}
 			} catch (err) {
 				logger.error("Error handling JSON-RPC message: {err}", { err });

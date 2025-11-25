@@ -8,7 +8,7 @@ export interface ConcurrentCreatorOptions {
 }
 
 export class TooManyWaitersError extends Error {
-	constructor(message = "Too many concurrent requests") {
+	constructor(message = "Too many concurrent waiters") {
 		super(message);
 		this.name = "TooManyWaitersError";
 	}
