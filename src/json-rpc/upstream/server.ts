@@ -92,9 +92,7 @@ export function createUpstreamServer({
 		};
 
 		ws.onmessage = ({ data }) => {
-			queueMicrotask(() =>
-				handleMessage(typeof data === "string" ? data : decoder.decode(data)),
-			);
+			handleMessage(typeof data === "string" ? data : decoder.decode(data));
 		};
 
 		ws.onclose = (event) => {
