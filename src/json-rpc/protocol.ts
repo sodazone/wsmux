@@ -84,23 +84,18 @@ export function jsonRpcMiddleware(
 			globalPending++;
 
 			try {
-				const apex = registry.resolveApexMethod(req.method);
-				if (apex) {
-					await apex.handleRequest(client, req);
-				} else {
-					const upstream = registry.resolveUpstream(ctx.ws.data, req.method);
-					if (!upstream) {
-						client.close(1013, "JSON-RPC Upstream Unavailable");
-						return;
-					}
-
-					const { server } = upstream;
-					if (!server.isReady()) {
-						await server.waitForReady();
-					}
-
-					await handleRPCMethod(client, server, req, methodHandlers);
+				const upstream = registry.resolveUpstream(ctx.ws.data, req.method);
+				if (!upstream) {
+					client.close(1013, "JSON-RPC Upstream Unavailable");
+					return;
 				}
+
+				const { server } = upstream;
+				if (!server.isReady()) {
+					await server.waitForReady();
+				}
+
+				await handleRPCMethod(client, server, req, methodHandlers);
 			} catch (err) {
 				logger.error("Error handling JSON-RPC message: {err}", { err });
 

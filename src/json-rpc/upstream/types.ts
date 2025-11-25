@@ -1,7 +1,6 @@
 import type { Observable } from "rxjs";
 
 import type { DownstreamClient } from "../downstream";
-import type { JSONRPCApexMethodHandler } from "../methods";
 import type {
 	JSONRPCContextData,
 	JSONRPCError,
@@ -106,7 +105,6 @@ export type UpstreamServerAndPool = {
 
 export type UpstreamRegistry = {
 	pools: UpstreamServerPool[];
-	resolveApexMethod: (method: string) => JSONRPCApexMethodHandler | undefined;
 	resolveUpstream: (
 		ctx: JSONRPCContextData,
 		method: string,

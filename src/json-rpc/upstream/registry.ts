@@ -1,8 +1,6 @@
 import { getLogger } from "@logtape/logtape";
 
 import type { UpstreamConfig } from "../../config";
-import type { JSONRPCApexMethodHandler } from "../methods";
-import { resolveRoutingPreset } from "../presets/routing";
 import type { JSONRPCContextData } from "../types";
 import { createUpstreamPool } from "./pool";
 import type { UpstreamRegistry, UpstreamServerAndPool } from "./types";
@@ -14,11 +12,6 @@ export function createUpstreamRegistry(
 ): UpstreamRegistry {
 	const pools = config.servers.map(createUpstreamPool);
 	const clientUpstream = new Map<number, UpstreamServerAndPool>();
-	const apex = Object.fromEntries(
-		config.apex
-			.map(resolveRoutingPreset)
-			.flatMap((record) => Object.entries(record)),
-	);
 
 	logger.info`#upstreamPools=${pools.length}`;
 
@@ -38,12 +31,6 @@ export function createUpstreamRegistry(
 
 			return { pool, server };
 		}
-	};
-
-	const resolveApexMethod = (
-		method: string,
-	): JSONRPCApexMethodHandler | undefined => {
-		return apex[method];
 	};
 
 	const resolveUpstream = (ctx: JSONRPCContextData, method: string) => {
@@ -76,7 +63,6 @@ export function createUpstreamRegistry(
 
 	return {
 		pools,
-		resolveApexMethod,
 		resolveUpstream,
 		disconnect: (clientId: number) => {
 			const serverAndPool = clientUpstream.get(clientId);

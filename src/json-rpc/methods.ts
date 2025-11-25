@@ -10,13 +10,6 @@ export interface JSONRPCMethodHandler {
 	) => Promise<void>;
 }
 
-export interface JSONRPCApexMethodHandler {
-	readonly handleRequest: (
-		client: DownstreamClient,
-		request: JSONRPCRequest,
-	) => Promise<void>;
-}
-
 export async function handleRPCMethod(
 	downstream: DownstreamClient,
 	upstream: UpstreamServer,
