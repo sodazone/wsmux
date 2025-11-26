@@ -2,6 +2,10 @@ import { printSummary, runChainHeadBench, type Script } from "./chain-head";
 
 const PROVIDERS = [
 	"ws://localhost:8181",
+	"wss://polkadot-public-rpc.blockops.network/ws",
+	"wss://polkadot-rpc.dwellir.com",
+	"wss://polkadot.public.curie.radiumblock.co/ws",
+	"wss://rockx-dot.w3node.com/polka-public-dot/ws",
 	"wss://rpc-polkadot.luckyfriday.io",
 	"wss://polkadot.api.onfinality.io/public-ws",
 	"wss://rpc.ibp.network/polkadot",
@@ -10,6 +14,7 @@ const PROVIDERS = [
 const ext = {
 	limitReached: 0,
 	invalidSubscription: 0,
+	exfiltratedOps: 0,
 };
 
 export const simpleFollow = (): Script => {
@@ -47,9 +52,7 @@ export const simpleFollow = (): Script => {
 					].includes(ev.event)
 				) {
 					if (!ops.delete(ev.operationId)) {
-						console.error(
-							`Operation ${ev.operationId} not seen before, likely exfiltrated`,
-						);
+						ext.exfiltratedOps++;
 					}
 				}
 			}
@@ -77,6 +80,7 @@ export const simpleFollow = (): Script => {
 		printSummary(stats);
 		console.log(`Limit reached: ${ext.limitReached}`);
 		console.log(`Invalid subscription: ${ext.invalidSubscription}`);
+		console.log(`Exfiltrated operations: ${ext.exfiltratedOps}`);
 		process.exit(0);
 	}, durationMs);
 })();
