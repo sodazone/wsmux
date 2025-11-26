@@ -7,6 +7,14 @@ The **wsmux** server is a high-performance WebSocket multiplexer built on [Bun.s
 
 It multiplexes client sessions over shared streams, with nested operation isolation, per-client subscription management, caching, telemetry, and server-affinity routing.
 
+## Architecture
+
+### Caching
+
+*TBD*
+
+### Multiplexing
+
 Conceptually, the multiplexing architecture looks like this:
 
 ```sh
