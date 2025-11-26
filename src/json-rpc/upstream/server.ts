@@ -56,11 +56,13 @@ export function createUpstreamServer({
 
 	function cleanup() {
 		if (reconnectTimer) clearTimeout(reconnectTimer);
-		for (const [_, unsub] of unsubscribers) {
-			try {
-				unsub();
-			} catch {
-				//
+		if (!stopped) {
+			for (const [_, unsub] of unsubscribers) {
+				try {
+					unsub();
+				} catch {
+					//
+				}
 			}
 		}
 

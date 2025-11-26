@@ -62,9 +62,9 @@ async function run(
 	const shutdown = () => {
 		if (stopping) return;
 		stopping = true;
+		registry.destroy();
 		handler.closeAll();
 		server.stop();
-		registry.destroy();
 	};
 
 	process.on("SIGINT", shutdown);
