@@ -9,11 +9,11 @@ It multiplexes client sessions over shared streams, with nested operation isolat
 
 Conceptually, the multiplexing architecture looks like this:
 
-```
-Wsmux                            // load balancing: round-robin per upstream
-├─ Upstream A                    // max_connections, WS load balancing: least-connections
-│   ├─ WS-1                      // max_clients_per_connection
-│   │   ├─ SharedSubscription-1  // e.g. max_subscribers for chainHead_v1_follow
+```sh
+Wsmux                            # load balancing: round-robin per upstream
+├─ Upstream A                    # max_connections, WS load balancing: least-connections
+│   ├─ WS-1                      # max_clients_per_connection
+│   │   ├─ SharedSubscription-1  # e.g. max_subscribers for chainHead_v1_follow
 │   │   │   ├─ Client-1
 │   │   │   └─ Client-2
 │   │   └─ SharedSubscription-2
