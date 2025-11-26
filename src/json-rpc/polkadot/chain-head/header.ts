@@ -25,8 +25,9 @@ export const chainHead_v1_header = (
 				if (res) {
 					chainHeadCacheMetrics.hits.labels(req.method).inc();
 					return {
-						...res,
 						id: req.id,
+						jsonrpc: "2.0",
+						result: res.result,
 					} as JSONRPCResponse;
 				}
 				chainHeadCacheMetrics.misses.labels(req.method).inc();

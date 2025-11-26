@@ -1,8 +1,9 @@
 import { getLogger } from "@logtape/logtape";
 import { randomUUIDv7 } from "bun";
-import { BehaviorSubject, firstValueFrom, of, Subject } from "rxjs";
-import { catchError, filter, map, take, timeout } from "rxjs/operators";
+import { BehaviorSubject, firstValueFrom, Subject } from "rxjs";
+import { filter, take, timeout } from "rxjs/operators";
 
+import { enqueueTask } from "@/util/micro-scheduler";
 import type {
 	JSONRPCError,
 	JSONRPCNotification,
@@ -22,7 +23,7 @@ const MAX_BACKOFF_MS = 10 * 60 * 1_000;
 const logger = getLogger(["wsmux", "upstream", "server"]);
 
 function createMessageSubject() {
-	return new Subject<JSONRPCResponse | JSONRPCNotification>();
+	return new Subject<JSONRPCNotification>();
 }
 
 export function createUpstreamServer({
@@ -40,7 +41,11 @@ export function createUpstreamServer({
 	const unsubscribers = new Map<string, () => void>();
 	const states = new Map<string, unknown>();
 	const subscriptions = createSharedSubscriptionGroup();
-	const message$ = createMessageSubject();
+	const notification$ = createMessageSubject();
+	const pending = new Map<
+		number,
+		(msg: JSONRPCResponse | JSONRPCError) => void
+	>();
 
 	let stopped = false;
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -62,6 +67,7 @@ export function createUpstreamServer({
 		unsubscribers.clear();
 		states.clear();
 		subscriptions.abort();
+		pending.clear();
 		_clients = 0;
 	}
 
@@ -100,7 +106,7 @@ export function createUpstreamServer({
 			logger.info`[${url}:${id}] disconnected (${event.code})`;
 
 			if (stopped) {
-				message$.complete();
+				notification$.complete();
 			} else {
 				cleanup();
 				scheduleReconnect();
@@ -132,11 +138,7 @@ export function createUpstreamServer({
 		},
 		supportedMethods,
 		subscriptions,
-		message$,
-		notification$: message$.pipe(
-			filter((m): m is JSONRPCNotification => "method" in m),
-			map((m) => m as JSONRPCNotification),
-		),
+		notification$,
 
 		isReady: () => {
 			const ws = connection$.value;
@@ -158,11 +160,10 @@ export function createUpstreamServer({
 			ws.send(JSON.stringify(req));
 		},
 
-		async request(
-			req: JSONRPCRequest,
-		): Promise<JSONRPCResponse | JSONRPCError> {
+		async request(req) {
 			const upstreamId = server.nextId();
 			const ws = connection$.value;
+
 			if (!ws || ws.readyState !== WebSocket.OPEN) {
 				return {
 					jsonrpc: "2.0",
@@ -171,50 +172,26 @@ export function createUpstreamServer({
 				};
 			}
 
-			const resp$ = message$.pipe(
-				filter(
-					(m): m is JSONRPCResponse | JSONRPCError =>
-						"id" in m && m.id === upstreamId,
-				),
-				take(1),
-				map(
-					(response) =>
-						({ ...response, id: req.id }) as JSONRPCResponse | JSONRPCError,
-				),
-				timeout(requestTimeout),
-				catchError((err) => {
-					logger.warn(
-						"[{url}] Request {method} stream aborted or timed out {err}",
-						{ url, err, method: req.method },
-					);
-
-					unhealthy = true;
-
-					return of({
+			return new Promise((resolve) => {
+				const timeoutId = setTimeout(() => {
+					pending.delete(upstreamId);
+					resolve({
 						jsonrpc: "2.0",
-						id: req.id,
+						id: req.id ?? null,
 						error: {
 							code: -32000,
-							message: `Upstream timeout for method ${req.method}`,
+							message: `Upstream timeout for ${req.method}`,
 						},
-					} as JSONRPCError);
-				}),
-			);
+					});
+				}, requestTimeout);
 
-			ws.send(JSON.stringify({ ...req, id: upstreamId }));
+				pending.set(upstreamId, (msg) => {
+					clearTimeout(timeoutId);
+					resolve({ ...msg, id: req.id ?? null });
+				});
 
-			try {
-				return await firstValueFrom(resp$);
-			} catch (error) {
-				if (stopped) {
-					return {
-						jsonrpc: "2.0",
-						id: null,
-						error: { code: -32000, message: "Upstream stopped" },
-					};
-				}
-				throw error;
-			}
+				ws.send(JSON.stringify({ ...req, id: upstreamId }));
+			});
 		},
 
 		unsubscribe(localId: string) {
@@ -280,7 +257,7 @@ export function createUpstreamServer({
 			return {
 				states: collectStats(states),
 				unsubscribers: unsubscribers.size,
-				messageSubscribers: (message$ as any).observers?.length ?? 0,
+				messageSubscribers: (notification$ as any).observers?.length ?? 0,
 				connections: _clients,
 				subscriptions: subscriptions.stats(),
 			};
@@ -289,8 +266,17 @@ export function createUpstreamServer({
 
 	function handleMessage(data: string) {
 		try {
-			const msg = JSON.parse(data) as JSONRPCResponse | JSONRPCNotification;
-			message$.next(msg);
+			const msg = JSON.parse(data);
+
+			if (msg.id !== undefined && pending.has(msg.id)) {
+				const resolver = pending.get(msg.id)!;
+				pending.delete(msg.id);
+
+				enqueueTask(() => resolver(msg));
+				return;
+			}
+
+			notification$.next(msg as JSONRPCNotification);
 		} catch (err) {
 			logger.error("[{url}:{id}] JSON parse error", { url, id, err });
 		}

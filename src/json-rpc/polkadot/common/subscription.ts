@@ -75,7 +75,7 @@ const createSubscriptionHandler = (
 
 			let done = false;
 
-			const sub = upstream.message$
+			const sub = upstream.notification$
 				.pipe(
 					filter((msg) => behavior.matchEvent(msg, upstreamId)),
 					takeWhile((msg) => !behavior.isTerminal(msg), true),

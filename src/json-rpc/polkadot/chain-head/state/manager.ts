@@ -183,10 +183,9 @@ export function createStateManager() {
 		);
 
 		const live$ = handleUpdates(
-			upstream.message$.pipe(
+			upstream.notification$.pipe(
 				filter(
 					(msg) =>
-						"method" in msg &&
 						msg.method === "chainHead_v1_followEvent" &&
 						msg.params?.subscription === upstreamSubId,
 				),

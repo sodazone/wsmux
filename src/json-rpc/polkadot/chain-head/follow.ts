@@ -1,5 +1,5 @@
 import { getLogger } from "@logtape/logtape";
-
+import { enqueueTask } from "@/util/micro-scheduler";
 import {
 	createConcurrentCreator,
 	TooManyWaitersError,
@@ -16,7 +16,7 @@ import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
 const DEFAULT_MAX_FOLLOWS_PER_UPSTREAM = 2;
-const DEFAULT_MAX_WAITERS = 1_500;
+const DEFAULT_MAX_WAITERS = 0;
 
 const logger = getLogger(["wsmux", "chainhead", "follow"]);
 
@@ -73,18 +73,20 @@ export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 					result: localId,
 				});
 
-				shared.subscribeLocal(localId, downstream, {
-					filter: filterOperationEvents,
-					transform: followNotifyTransform(request),
-				});
+				enqueueTask(() => {
+					shared.subscribeLocal(localId, downstream, {
+						filter: filterOperationEvents,
+						transform: followNotifyTransform(request),
+					});
 
-				upstream.setUnsubscriber(localId, () => {
-					pinnedBlocks.unsubscribeLocal(upstream, localId);
-					shared.unsubscribeLocal(localId);
+					upstream.setUnsubscriber(localId, () => {
+						pinnedBlocks.unsubscribeLocal(upstream, localId);
+						shared.unsubscribeLocal(localId);
 
-					if (shared.subscribersCount() === 0) {
-						followLimitReached.delete(upstreamId);
-					}
+						if (shared.subscribersCount() === 0) {
+							followLimitReached.delete(upstreamId);
+						}
+					});
 				});
 			}
 
