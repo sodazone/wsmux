@@ -20,7 +20,7 @@ export const simpleFollow = (): Script => {
 		},
 
 		onResponse: (res) => {
-			if (res) {
+			if (res != null) {
 				if (res.result === "started") {
 					ops.add(res.operationId);
 				}
