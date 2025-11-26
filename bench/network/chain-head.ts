@@ -105,11 +105,7 @@ export function runChainHeadBench(
 					pendings.delete(msg.id);
 
 					if (ok) {
-						if (msg.result) {
-							script.onResponse?.(msg.result, send);
-						} else {
-							console.error(msg, p);
-						}
+						script.onResponse?.(msg.result, send);
 					} else {
 						script.onError?.(msg.error, send);
 					}
