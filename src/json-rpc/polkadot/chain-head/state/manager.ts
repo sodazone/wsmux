@@ -10,6 +10,7 @@ import {
 	timeout,
 } from "rxjs/operators";
 
+import { isFollowOperation } from "@/json-rpc/util";
 import type { JSONRPCNotification } from "../../../types";
 import type { UpstreamServer } from "../../../upstream";
 import { createBlockTracker } from "./blocks";
@@ -187,7 +188,8 @@ export function createStateManager() {
 				filter(
 					(msg) =>
 						msg.method === "chainHead_v1_followEvent" &&
-						msg.params?.subscription === upstreamSubId,
+						msg.params?.subscription === upstreamSubId &&
+						!isFollowOperation(msg),
 				),
 				map((msg) => msg as JSONRPCNotification),
 			),
@@ -217,8 +219,15 @@ export function createStateManager() {
 						}
 
 						const replayEvents = snapshotEvents(upstreamSubId);
-						logger.debug((l) => l`Replaying ${replayEvents.length} events`);
-						return concat(from(replayEvents), live$);
+						logger.info(
+							(l) => l`Replaying ${replayEvents.length} events ${replayEvents}`,
+						);
+						return concat(
+							from(replayEvents),
+							live$.pipe(
+								filter((msg) => msg.params?.result.event !== "initialized"),
+							),
+						);
 					}),
 				)
 				.subscribe(subscriber);
