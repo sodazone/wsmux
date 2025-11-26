@@ -9,6 +9,7 @@ type Stats = {
 	open: number;
 	close: number;
 	errors: number;
+	exfiltrated: number;
 	msgs: number;
 	events: number;
 	latency: LatencyMap;
@@ -18,8 +19,8 @@ type Pending = { method: Method; sent: number };
 
 export type Script = {
 	onOpen?: (send: Send) => void;
-	onResponse?: (pending: Pending, send: Send, result: any) => void;
-	onError?: (pending: Pending, send: Send, error: any) => void;
+	onResponse?: (result: any, send: Send) => void;
+	onError?: (error: any, send: Send) => void;
 	onEvent?: (subId: string | null, ev: any, send: Send) => void;
 };
 
@@ -41,6 +42,7 @@ const createStats = (host: string): Stats => ({
 	open: 0,
 	close: 0,
 	errors: 0,
+	exfiltrated: 0,
 	msgs: 0,
 	events: 0,
 	latency: emptyLatency(),
@@ -103,11 +105,17 @@ export function runChainHeadBench(
 					pendings.delete(msg.id);
 
 					if (ok) {
-						script.onResponse?.(p, send, msg.result);
+						if (msg.result) {
+							script.onResponse?.(msg.result, send);
+						} else {
+							console.error(msg, p);
+						}
 					} else {
-						script.onError?.(p, send, msg.error);
+						script.onError?.(msg.error, send);
 					}
 					if (p.method === "follow") subId = msg.result;
+				} else {
+					stats.exfiltrated++;
 				}
 				return;
 			}
@@ -116,6 +124,8 @@ export function runChainHeadBench(
 			if (msg.params?.subscription === subId) {
 				if (!isWarm) stats.events++;
 				script.onEvent?.(subId, msg.params.result, send);
+			} else {
+				stats.exfiltrated++;
 			}
 		};
 
@@ -190,9 +200,11 @@ export const printSummary = (s: Stats) => {
 
 	const fmt = (x: number) => x.toFixed(2);
 
-	console.log(`Benchmark ${s.host}`);
+	console.log(`Summary ${s.host}`);
 	console.log(`open: ${s.open} close: ${s.close} errors: ${s.errors}`);
-	console.log(`msgs: ${s.msgs} events: ${s.events}`);
+	console.log(
+		`msgs: ${s.msgs} events: ${s.events} exfiltrated: ${s.exfiltrated}`,
+	);
 	console.log("Latency (ms):");
 
 	for (const method of Object.keys(s.latency) as Method[]) {
