@@ -49,6 +49,8 @@ function normalizeUpstreamServer(
 		connectionTimeout: parseDuration(u.connection_timeout),
 		retryDelay: parseDuration(u.retry_delay),
 		maxConnections: u.max_connections,
+		minConnections: u.min_connections,
+		maxClientsPerConnection: u.max_clients_per_connection,
 		supportedMethods,
 		methods: u.methods ?? {},
 	};

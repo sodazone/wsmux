@@ -16,6 +16,8 @@ export type RawUpstreamServerConfig = {
 	retry_delay?: DurationString;
 
 	max_connections?: number;
+	min_connections?: number;
+	max_clients_per_connection?: number;
 	supported_methods?: "*" | string[];
 	presets?: string | string[];
 	methods?: Record<string, UpstreamMethodLimits>;
