@@ -83,7 +83,9 @@ const forwardHandler = ({
 			);
 
 			const notification$ = upstream.notification$.pipe(
-				filter(isForOp),
+				filter(
+					(msg) => isForOp(msg) && !terminus.has(msg.params!.result.event),
+				),
 				takeUntil(done$),
 			);
 
@@ -232,7 +234,9 @@ const forwardWithCacheHandler = ({
 			);
 
 			const notification$ = upstream.notification$.pipe(
-				filter(isForOp),
+				filter(
+					(msg) => isForOp(msg) && !terminus.has(msg.params!.result.event),
+				),
 				takeUntil(done$),
 			);
 
