@@ -55,7 +55,7 @@ upstream:
       url: wss://dot-rpc.stakeworld.io
       presets: polkadot
       max_connections: 500
-      max_clients_per_connection: 50
+      max_clients_per_connection: 8
       methods:
         chainHead_v1_follow:
           max_subscribers: 4
@@ -63,7 +63,7 @@ upstream:
       url: wss://rpc-polkadot.helixstreet.io
       presets: polkadot
       max_connections: 500
-      max_clients_per_connection: 50
+      max_clients_per_connection: 8
       methods:
         chainHead_v1_follow:
           max_subscribers: 4
@@ -71,7 +71,7 @@ upstream:
       url: wss://rpc-polkadot.luckyfriday.io
       presets: polkadot
       max_connections: 500
-      max_clients_per_connection: 50
+      max_clients_per_connection: 8
       methods:
         chainHead_v1_follow:
           max_subscribers: 4
