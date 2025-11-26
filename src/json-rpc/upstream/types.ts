@@ -49,6 +49,7 @@ export type UpstreamServer = {
 	id: string;
 	url: string;
 	nextId(): number;
+	maxClientsPerConnection: number;
 	subscriptions: SharedSubscriptionGroup;
 	setUnsubscriber(localId: string, unsub: () => void): void;
 	removeUnsubscriber(localId: string): void;
@@ -62,7 +63,7 @@ export type UpstreamServer = {
 	};
 	isReady(): boolean;
 	hasCapacity(): boolean;
-	connections: {
+	clients: {
 		inc(): void;
 		dec(): void;
 	};

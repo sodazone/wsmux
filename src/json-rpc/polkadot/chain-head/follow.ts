@@ -16,26 +16,31 @@ import { chainHeadStateFrom } from "./state";
 import { followNotifyTransform } from "./transform";
 
 const DEFAULT_MAX_FOLLOWS_PER_UPSTREAM = 2;
-const DEFAULT_MAX_WAITERS = 10;
 
 const logger = getLogger(["wsmux", "chainhead", "follow"]);
 
 export const chainHead_v1_follow = (): JSONRPCMethodHandler => {
 	const methodKey = "chainHead_v1_follow";
-
-	const getOrCreateFollow = createConcurrentCreator({
-		// TODO: make this configurable
-		maxWaiting: DEFAULT_MAX_WAITERS,
-		label: methodKey,
-	});
-
 	const followLimitReached = new Set<string>();
+	const upstreamWaiters = new Map<
+		string,
+		ReturnType<typeof createConcurrentCreator>
+	>();
 
 	return {
 		async handleRequest(upstream, downstream, request) {
 			const { managers, pinnedBlocks } = chainHeadStateFrom(upstream);
 			const clientId = downstream.clientId;
-			const upstreamId = upstream.url;
+			const upstreamId = upstream.id;
+
+			let getOrCreateFollow = upstreamWaiters.get(upstreamId);
+			if (!getOrCreateFollow) {
+				getOrCreateFollow = createConcurrentCreator({
+					maxWaiting: upstream.maxClientsPerConnection,
+					label: `${methodKey}:${upstreamId}`,
+				});
+				upstreamWaiters.set(upstreamId, getOrCreateFollow);
+			}
 
 			logger.debug((l) => l`[${upstreamId}] Follow request from ${clientId}`);
 

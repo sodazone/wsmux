@@ -17,7 +17,7 @@ import type { UpstreamServer, UpstreamServerConfig } from "./types";
 const DEFAULT_REQUEST_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
 const DEFAULT_RETRY_DELAY_MS = 2_000;
-const DEFAULT_MAX_CLIENTS_PER_CONNECTION = 15;
+const DEFAULT_MAX_CLIENTS_PER_CONNECTION = 50;
 const MAX_BACKOFF_MS = 10 * 60 * 1_000;
 
 const logger = getLogger(["wsmux", "upstream", "server"]);
@@ -118,7 +118,7 @@ export function createUpstreamServer({
 		};
 	}
 
-	const connections = {
+	const clients = {
 		inc() {
 			_clients++;
 		},
@@ -149,7 +149,9 @@ export function createUpstreamServer({
 			return _clients < maxClientsPerConnection;
 		},
 
-		connections,
+		clients,
+
+		maxClientsPerConnection,
 
 		send(req: JSONRPCRequest | JSONRPCNotification) {
 			const ws = connection$.value;

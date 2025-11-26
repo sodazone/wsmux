@@ -40,7 +40,7 @@ export function createUpstreamPool({
 	function start() {
 		for (let i = 0; i < minConnections; i++) {
 			const conn = createNewConn();
-			conn.connections.inc();
+			conn.clients.inc();
 			heap.update(conn);
 		}
 		return heap.items().filter(Boolean);
@@ -52,7 +52,7 @@ export function createUpstreamPool({
 		if (!best || !best.hasCapacity()) {
 			if (heap.size() < maxConnections) {
 				const conn = createNewConn();
-				conn.connections.inc();
+				conn.clients.inc();
 				heap.update(conn);
 				lastUsed.set(conn, now());
 				return conn;
@@ -60,7 +60,7 @@ export function createUpstreamPool({
 		}
 
 		if (best) {
-			best.connections.inc();
+			best.clients.inc();
 			heap.update(best);
 			lastUsed.set(best, now());
 		}
@@ -69,7 +69,7 @@ export function createUpstreamPool({
 	}
 
 	function releaseConn(conn: UpstreamServer) {
-		conn.connections.dec();
+		conn.clients.dec();
 		heap.update(conn);
 		lastUsed.set(conn, now());
 	}
