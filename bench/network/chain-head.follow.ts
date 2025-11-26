@@ -3,6 +3,7 @@ import { printSummary, runChainHeadBench, type Script } from "./chain-head";
 const PROVIDERS = [
 	"ws://localhost:8181",
 	"wss://polkadot.api.onfinality.io/public-ws",
+	"wss://rpc.ibp.network/polkadot",
 ];
 
 export const basicScript = (): Script => ({
@@ -26,7 +27,7 @@ export const basicScript = (): Script => ({
 
 	const stats = runChainHeadBench(
 		PROVIDERS[0]!,
-		{ iterations: 20, warmup: 0 },
+		{ iterations: 1_000, warmup: 0 },
 		basicScript,
 	);
 
