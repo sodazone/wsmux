@@ -242,7 +242,7 @@ function createSharedSubscriptionPool(
 function _createSharedSubscription(
 	upstreamSubId: string,
 	source$: Observable<JSONRPCNotification>,
-	destroy: (aborder: boolean) => Promise<void> | void,
+	destroy: (aborted: boolean) => Promise<void> | void,
 	onLocalUnsubscribe: (localId: string) => void,
 ): SharedSubscription {
 	let aborted = false;
@@ -260,6 +260,7 @@ function _createSharedSubscription(
 	const doDestroy = async (aborted: boolean) => {
 		if (destroyed) return;
 		destroyed = true;
+		logger.info`[${upstreamSubId}] destroying shared subscription (abort=${aborted})`;
 		await destroy(aborted);
 		logger.info`[${upstreamSubId}] destroyed shared subscription`;
 	};

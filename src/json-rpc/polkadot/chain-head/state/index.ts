@@ -36,7 +36,7 @@ function createStateManagersMap(onUnfollow: (upstreamSubId: string) => void) {
 
 				logger.info(
 					(l) =>
-						l`[${upstreamSubId}] ${aborted ? "clean up" : "unfollow"} upstream`,
+						l`[${upstreamSubId}] ${aborted ? "clean up" : "unfollow"} upstream (abort=${aborted})`,
 				);
 
 				pool.release(followKey);
