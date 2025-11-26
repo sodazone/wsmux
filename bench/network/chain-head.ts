@@ -196,7 +196,7 @@ export const printSummary = (s: Stats) => {
 
 	const fmt = (x: number) => x.toFixed(2);
 
-	console.log(`Summary ${s.host}`);
+	console.log(`\nSummary (${s.host})`);
 	console.log(`open: ${s.open} close: ${s.close} errors: ${s.errors}`);
 	console.log(
 		`msgs: ${s.msgs} events: ${s.events} exfiltrated: ${s.exfiltrated}`,
