@@ -219,7 +219,7 @@ export function createStateManager() {
 						}
 
 						const replayEvents = snapshotEvents(upstreamSubId);
-						logger.info(
+						logger.debug(
 							(l) => l`Replaying ${replayEvents.length} events ${replayEvents}`,
 						);
 						return concat(
