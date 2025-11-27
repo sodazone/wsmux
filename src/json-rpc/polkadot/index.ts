@@ -1,5 +1,7 @@
 import type { CacheConfig } from "@/config";
 import type { JSONRPCMethodHandler } from "../methods";
+import { archive_v1_body } from "./archive/body";
+import { archive_v1_header } from "./archive/header";
 import { archive_v1_storage, archive_v1_storageDiff } from "./archive/storage";
 import { chainHead_v1_body } from "./chain-head/body";
 import { chainHead_v1_call } from "./chain-head/call";
@@ -40,6 +42,8 @@ export function polkadotMethods(config: CacheConfig) {
 
 		archive_v1_storage: archive_v1_storage(),
 		archive_v1_storageDiff: archive_v1_storageDiff(),
+		archive_v1_body: archive_v1_body(config),
+		archive_v1_header: archive_v1_header(config),
 
 		transactionWatch_v1_submitAndWatch: transactionWatch_v1_submitAndWatch(),
 

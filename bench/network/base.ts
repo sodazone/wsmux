@@ -1,8 +1,6 @@
 import { isSuccess } from "@/json-rpc/util";
 
-type Method = "follow" | "header" | "body";
-
-type LatencyMap = Record<Method, { n: number; total: number; data: number[] }>;
+type LatencyMap = Record<string, { n: number; total: number; data: number[] }>;
 
 type Stats = {
 	host: string;
@@ -15,7 +13,7 @@ type Stats = {
 	latency: LatencyMap;
 };
 
-type Pending = { method: Method; sent: number };
+type Pending = { method: string; sent: number };
 
 export type Script = {
 	onOpen?: (send: Send) => void;
@@ -24,18 +22,7 @@ export type Script = {
 	onEvent?: (subId: string | null, ev: any, send: Send) => void;
 };
 
-type Send = (
-	method: Method,
-	rpcMethod: string,
-	params: any[],
-	inFollow?: boolean,
-) => void;
-
-const emptyLatency = (): LatencyMap => ({
-	follow: { n: 0, total: 0, data: [] },
-	header: { n: 0, total: 0, data: [] },
-	body: { n: 0, total: 0, data: [] },
-});
+type Send = (rpcMethod: string, params?: any[]) => number;
 
 const createStats = (host: string): Stats => ({
 	host,
@@ -45,10 +32,10 @@ const createStats = (host: string): Stats => ({
 	exfiltrated: 0,
 	msgs: 0,
 	events: 0,
-	latency: emptyLatency(),
+	latency: {},
 });
 
-export function runChainHeadBench(
+export function runBench(
 	endpoint: string,
 	{
 		iterations,
@@ -70,12 +57,13 @@ export function runChainHeadBench(
 		let nextId = 1;
 		let subId: string | null = null;
 
-		const send: Send = (method, rpcMethod, params) => {
+		const send: Send = (rpcMethod, params) => {
 			const id = nextId++;
-			pendings.set(id, { method, sent: performance.now() });
+			pendings.set(id, { method: rpcMethod, sent: performance.now() });
 			ws.send(
 				JSON.stringify({ jsonrpc: "2.0", id, method: rpcMethod, params }),
 			);
+			return id;
 		};
 
 		ws.onopen = () => {
@@ -96,7 +84,12 @@ export function runChainHeadBench(
 					const ok = isSuccess(msg);
 					if (!isWarm) {
 						const dt = now - p.sent;
-						const lat = stats.latency[p.method];
+
+						if (stats.latency[p.method] === undefined) {
+							stats.latency[p.method] = { n: 0, total: 0, data: [] };
+						}
+						const lat = stats.latency[p.method]!;
+
 						lat.n++;
 						lat.total += dt;
 						lat.data.push(dt);
@@ -109,7 +102,7 @@ export function runChainHeadBench(
 					} else {
 						script.onError?.(msg.error, send);
 					}
-					if (p.method === "follow") subId = msg.result;
+					if (p.method === "chainHead_v1_follow") subId = msg.result;
 				} else {
 					stats.exfiltrated++;
 				}
@@ -203,7 +196,9 @@ export const printSummary = (s: Stats) => {
 	);
 	console.log("Latency (ms):");
 
-	for (const method of Object.keys(s.latency) as Method[]) {
+	for (const method of Object.keys(s.latency) as string[]) {
+		if (s.latency[method] === undefined) continue;
+
 		const xs = s.latency[method].data;
 		const r = summarize(xs);
 

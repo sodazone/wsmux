@@ -21,20 +21,12 @@ cache:
     chainHead_v1_call:
       enabled: true
       max_entries: 25
-
-# -------------------------------------------------------------------
-# IP rate limiting
-# -------------------------------------------------------------------
-rate_limit:
-  enabled: false
-  window: 1m
-  max_requests: 100
-  # Trusted networks for forwarding/proxy headers.
-  # CIDR notation is used to specify the network ranges.
-  trusted_networks:
-    - 192.168.0.0/16
-    - 172.16.0.0/12
-    - 127.0.0.1/32
+    archive_v1_header:
+      enabled: true
+      max_entries: 100
+    archive_v1_body:
+      enabled: true
+      max_entries: 25
 
 # -------------------------------------------------------------------
 # Upstream Servers Settings
@@ -83,3 +75,16 @@ json_rpc:
   max_pending_requests_per_connection: 1500
   max_pending_requests: 5000
   max_requests_per_second: 5000
+# -------------------------------------------------------------------
+# IP rate limiting
+# -------------------------------------------------------------------
+#rate_limit:
+#  enabled: false
+#  window: 1m
+#  max_requests: 100
+#  # Trusted networks for forwarding/proxy headers.
+#  # CIDR notation is used to specify the network ranges.
+#  trusted_networks:
+#    - 192.168.0.0/16
+#    - 172.16.0.0/12
+#    - 127.0.0.1/32

@@ -1,9 +1,8 @@
-import { printSummary, runChainHeadBench, type Script } from "./chain-head";
+import { printSummary, runBench, type Script } from "./base";
 
 const PROVIDERS = [
 	"ws://localhost:8181",
 	"wss://polkadot-public-rpc.blockops.network/ws",
-	"wss://polkadot-rpc.dwellir.com",
 	"wss://polkadot.public.curie.radiumblock.co/ws",
 	"wss://rockx-dot.w3node.com/polka-public-dot/ws",
 	"wss://rpc-polkadot.luckyfriday.io",
@@ -21,7 +20,7 @@ export const simpleFollow = (): Script => {
 	const ops = new Set<string>();
 	return {
 		onOpen: (send) => {
-			send("follow", "chainHead_v1_follow", [true]);
+			send("chainHead_v1_follow", [true]);
 		},
 
 		onResponse: (res) => {
@@ -39,8 +38,8 @@ export const simpleFollow = (): Script => {
 
 		onEvent: (subId, ev, send) => {
 			if (ev.event === "newBlock") {
-				send("body", "chainHead_v1_body", [subId, ev.blockHash]);
-				send("header", "chainHead_v1_header", [subId, ev.blockHash]);
+				send("chainHead_v1_body", [subId, ev.blockHash]);
+				send("chainHead_v1_header", [subId, ev.blockHash]);
 			}
 
 			if (ev.operationId != null) {
@@ -66,7 +65,7 @@ export const simpleFollow = (): Script => {
 (async () => {
 	const provider = PROVIDERS[0]!;
 	const opts = {
-		iterations: 1_000,
+		iterations: 100,
 		warmup: 0,
 	};
 	const durationMs = 10_000;
@@ -74,7 +73,7 @@ export const simpleFollow = (): Script => {
 		`Benchmarking ${provider} (iters=${opts.iterations}, duration=${durationMs / 1_000}s)`,
 	);
 
-	const stats = runChainHeadBench(provider, opts, simpleFollow);
+	const stats = runBench(provider, opts, simpleFollow);
 
 	setTimeout(() => {
 		printSummary(stats);
