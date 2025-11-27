@@ -1,4 +1,4 @@
-import { printSummary, runBench, type Script } from "./base";
+import { printSummary, runBench, type Script } from "./_base/benchmark";
 
 const PROVIDERS = [
 	"ws://localhost:8181",
@@ -65,7 +65,7 @@ export const simpleFollow = (): Script => {
 (async () => {
 	const provider = PROVIDERS[0]!;
 	const opts = {
-		iterations: 100,
+		iterations: 1_000,
 		warmup: 0,
 	};
 	const durationMs = 10_000;

@@ -114,7 +114,7 @@ export function runBench(
 				if (!isWarm) stats.events++;
 				script.onEvent?.(subId, msg.params.result, send);
 			} else {
-				stats.exfiltrated++;
+				console.warn("Unexpected subscription event", msg, subId);
 			}
 		};
 
