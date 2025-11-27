@@ -1,4 +1,4 @@
-import { printSummary, runBench, type Script } from "./base";
+import { printSummary, runBench, type Script } from "./_base/benchmark";
 
 const PROVIDERS = [
 	"ws://localhost:8181",
@@ -18,13 +18,13 @@ export const simpleArchive = (): Script => {
 			send("archive_v1_finalizedHeight");
 		},
 
-		onResponse: (res, send) => {
-			if (res != null) {
+		onResponse: ({ result }, send) => {
+			if (result != null) {
 				if (finalizedHeight === null) {
-					finalizedHeight = Number(res);
+					finalizedHeight = Number(result);
 					send("archive_v1_hashByHeight", [finalizedHeight]);
 				} else if (hashByHeight === null) {
-					hashByHeight = res[0];
+					hashByHeight = result[0];
 					send("archive_v1_header", [hashByHeight]);
 					send("archive_v1_body", [hashByHeight]);
 				}

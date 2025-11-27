@@ -17,9 +17,9 @@ type Pending = { method: string; sent: number };
 
 export type Script = {
 	onOpen?: (send: Send) => void;
-	onResponse?: (result: any, send: Send) => void;
+	onResponse?: (response: any, send: Send) => void;
 	onError?: (error: any, send: Send) => void;
-	onEvent?: (subId: string | null, ev: any, send: Send) => void;
+	onEvent?: (ev: any, send: Send) => void;
 };
 
 type Send = (rpcMethod: string, params?: any[]) => number;
@@ -55,8 +55,6 @@ export function runBench(
 		pendingMap.set(ws, pendings);
 
 		let nextId = 1;
-		let subId: string | null = null;
-
 		const send: Send = (rpcMethod, params) => {
 			const id = nextId++;
 			pendings.set(id, { method: rpcMethod, sent: performance.now() });
@@ -98,24 +96,19 @@ export function runBench(
 					pendings.delete(msg.id);
 
 					if (ok) {
-						script.onResponse?.(msg.result, send);
+						script.onResponse?.(msg, send);
 					} else {
-						script.onError?.(msg.error, send);
+						script.onError?.(msg, send);
 					}
-					if (p.method === "chainHead_v1_follow") subId = msg.result;
 				} else {
 					stats.exfiltrated++;
 				}
 				return;
 			}
 
-			// subscription event
-			if (msg.params?.subscription === subId) {
-				if (!isWarm) stats.events++;
-				script.onEvent?.(subId, msg.params.result, send);
-			} else {
-				console.warn("Unexpected subscription event", msg, subId);
-			}
+			// notification
+			if (!isWarm) stats.events++;
+			script.onEvent?.(msg, send);
 		};
 
 		ws.onerror = () => {

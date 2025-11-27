@@ -18,17 +18,23 @@ const ext = {
 
 export const simpleFollow = (): Script => {
 	const ops = new Set<string>();
+	let subId: string | null = null;
+
 	return {
 		onOpen: (send) => {
 			send("chainHead_v1_follow", [true]);
 		},
 
-		onResponse: (res) => {
-			if (res != null) {
-				if (res.result === "started") {
-					ops.add(res.operationId);
+		onResponse: ({ result }) => {
+			if (result != null) {
+				if (subId === null && typeof result === "string") {
+					subId = result;
+					return;
 				}
-				if (res.result === "limitReached") {
+				if (result.result === "started") {
+					ops.add(result.operationId);
+				}
+				if (result.result === "limitReached") {
 					ext.limitReached++;
 				}
 			} else {
@@ -36,7 +42,17 @@ export const simpleFollow = (): Script => {
 			}
 		},
 
-		onEvent: (subId, ev, send) => {
+		onEvent: (msg, send) => {
+			if (subId === null) {
+				console.warn("No subId", msg, subId);
+				return;
+			}
+
+			if (msg.params?.subscription !== subId) {
+				console.warn("Unexpected event", msg, subId);
+			}
+
+			const ev = msg.params?.result;
 			if (ev.event === "newBlock") {
 				send("chainHead_v1_body", [subId, ev.blockHash]);
 				send("chainHead_v1_header", [subId, ev.blockHash]);
@@ -65,7 +81,7 @@ export const simpleFollow = (): Script => {
 (async () => {
 	const provider = PROVIDERS[0]!;
 	const opts = {
-		iterations: 1_000,
+		iterations: 100,
 		warmup: 0,
 	};
 	const durationMs = 10_000;

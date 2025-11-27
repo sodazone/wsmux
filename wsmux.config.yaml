@@ -75,6 +75,8 @@ json_rpc:
   max_pending_requests_per_connection: 1500
   max_pending_requests: 5000
   max_requests_per_second: 5000
+#
+#
 # -------------------------------------------------------------------
 # IP rate limiting
 # -------------------------------------------------------------------
