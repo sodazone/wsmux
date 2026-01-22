@@ -147,4 +147,7 @@ docker run -it --rm \
 
 ---
 
-Enjoy wsmux!
+Developed by [SO/DA zone](https://soda.zone).
+
+❤️ Enjoy wsmux!
+
